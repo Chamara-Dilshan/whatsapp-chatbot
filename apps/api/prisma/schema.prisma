@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Tenant ──────────────────────────────────────────────────────────
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  plan      String   @default("free")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users            TenantUser[]
+  whatsapp         TenantWhatsApp[]
+  customers        Customer[]
+  conversations    Conversation[]
+  messages         Message[]
+  products         Product[]
+  policies         TenantPolicies?
+  templates        ReplyTemplate[]
+  automationEvents AutomationEvent[]
+  cases            Case[]
+}
+
+model TenantUser {
+  id           String   @id @default(cuid())
+  tenantId     String
+  email        String
+  passwordHash String
+  name         String
+  role         String   @default("agent") // owner | admin | agent
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
+model TenantWhatsApp {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  phoneNumberId      String   @unique
+  displayPhone       String
+  wabaId             String?
+  accessTokenEnc     String   // Encrypted access token
+  appSecretEnc       String   // Encrypted app secret
+  webhookVerifyToken String
+  catalogId          String?
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+// ─── Customer ────────────────────────────────────────────────────────
+
+model Customer {
+  id        String    @id @default(cuid())
+  tenantId  String
+  waId      String // WhatsApp ID (phone number without +)
+  name      String?
+  phone     String?
+  optedOut  Boolean   @default(false)
+  optOutAt  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  conversations Conversation[]
+  messages      Message[]
+
+  @@unique([tenantId, waId])
+  @@index([tenantId])
+}
+
+// ─── Conversation ────────────────────────────────────────────────────
+
+model Conversation {
+  id                  String    @id @default(cuid())
+  tenantId            String
+  customerId          String
+  phoneNumberId       String
+  status              String    @default("bot") // bot | needs_agent | agent | closed
+  assignedToUserId    String?
+  lastMessageAt       DateTime?
+  lastInboundAt       DateTime?
+  lastOutboundAt      DateTime?
+  firstNeedsAgentAt   DateTime?
+  windowExpiresAt     DateTime? // 24h messaging window
+  closedAt            DateTime?
+  lastIntent          String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+  messages Message[]
+  cases    Case[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, assignedToUserId, status])
+  @@index([tenantId, updatedAt])
+  @@index([customerId])
+  @@index([phoneNumberId])
+}
+
+// ─── Message ─────────────────────────────────────────────────────────
+
+model Message {
+  id             String   @id @default(cuid())
+  tenantId       String
+  conversationId String
+  customerId     String?
+  waMessageId    String?  @unique // WhatsApp message ID for idempotency
+  direction      String // inbound | outbound
+  type           String   @default("text") // text | image | interactive | template | system
+  body           String?
+  mediaUrl       String?
+  metadata       Json? // raw WhatsApp payload, interactive replies, etc.
+  intent         String?
+  confidence     Float?
+  sentBy         String? // TenantUser.id if agent-sent
+  status         String   @default("received") // received | sent | delivered | read | failed
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  customer     Customer?    @relation(fields: [customerId], references: [id])
+
+  @@index([tenantId])
+  @@index([conversationId])
+  @@index([conversationId, createdAt])
+  @@index([waMessageId])
+}
+
+// ─── Product ─────────────────────────────────────────────────────────
+
+model Product {
+  id          String   @id @default(cuid())
+  tenantId    String
+  retailerId  String // Retailer-specific product ID
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  currency    String   @default("USD")
+  imageUrl    String?
+  category    String?
+  keywords    String[] @default([])
+  inStock     Boolean  @default(true)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, retailerId])
+  @@index([tenantId])
+  @@index([tenantId, category])
+  @@index([tenantId, isActive])
+}
+
+// ─── Policies ────────────────────────────────────────────────────────
+
+model TenantPolicies {
+  id             String   @id @default(cuid())
+  tenantId       String   @unique
+  returnPolicy   String?  @db.Text
+  shippingPolicy String?  @db.Text
+  faqContent     String?  @db.Text
+  businessHours  Json? // { mon: { open: "09:00", close: "17:00" }, ... }
+  timezone       String   @default("UTC")
+  autoReplyDelay Int      @default(0) // milliseconds
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Reply Templates ─────────────────────────────────────────────────
+
+model ReplyTemplate {
+  id        String   @id @default(cuid())
+  tenantId  String
+  intent    String
+  name      String
+  body      String   @db.Text
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, intent])
+  @@index([tenantId])
+}
+
+// ─── Automation Events ───────────────────────────────────────────────
+
+model AutomationEvent {
+  id            String    @id @default(cuid())
+  tenantId      String
+  eventType     String
+  payload       Json
+  status        String    @default("pending") // pending | dispatched | delivered | failed
+  attempts      Int       @default(0)
+  lastAttemptAt DateTime?
+  nextRetryAt   DateTime?
+  processedAt   DateTime?
+  error         String?
+  createdAt     DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([status, nextRetryAt])
+}
+
+// ─── Case (Ticket) ───────────────────────────────────────────────────
+
+model Case {
+  id              String    @id @default(cuid())
+  tenantId        String
+  conversationId  String
+  subject         String?
+  priority        String    @default("medium") // low | medium | high | urgent
+  status          String    @default("open") // open | in_progress | resolved | closed
+  tags            String[]  @default([])
+  assignedTo      String? // TenantUser.id
+  notes           String?   @db.Text
+  resolution      String?   @db.Text
+  slaDeadline     DateTime?
+  firstResponseAt DateTime?
+  resolvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, assignedTo, status])
+  @@index([conversationId])
+}

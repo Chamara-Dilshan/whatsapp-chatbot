@@ -1,0 +1,35 @@
+{
+  "name": "whatsapp-chatbot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-tenant WhatsApp Business Support Bot SaaS",
+  "scripts": {
+    "dev": "pnpm --filter @whatsapp-bot/api dev & pnpm --filter @whatsapp-bot/dashboard dev",
+    "dev:api": "pnpm --filter @whatsapp-bot/api dev",
+    "dev:dashboard": "pnpm --filter @whatsapp-bot/dashboard dev",
+    "build": "pnpm --filter @whatsapp-bot/shared build && pnpm --filter @whatsapp-bot/api build && pnpm --filter @whatsapp-bot/dashboard build",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "prisma:migrate": "pnpm --filter @whatsapp-bot/api prisma:migrate",
+    "prisma:generate": "pnpm --filter @whatsapp-bot/api prisma:generate",
+    "prisma:seed": "pnpm --filter @whatsapp-bot/api prisma:seed",
+    "prisma:studio": "pnpm --filter @whatsapp-bot/api prisma:studio",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "esbuild",
+      "prisma"
+    ]
+  }
+}

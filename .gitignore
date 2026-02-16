@@ -1,0 +1,28 @@
+node_modules/
+dist/
+.next/
+.env
+.env.local
+*.log
+.DS_Store
+Thumbs.db
+
+# Prisma
+apps/api/prisma/migrations/**/migration_lock.toml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build
+*.tsbuildinfo
+
+# Docker volumes
+pgdata/
+
+# Claude AI
+.claude/
+PLAN.md
+CLAUDE.md
