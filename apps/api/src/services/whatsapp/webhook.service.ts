@@ -135,7 +135,7 @@ async function processInboundMessage(
     'Intent detected'
   );
 
-  // Step 12: Response generation
+  // Step 12: Response generation (with extractedQuery for product search)
   const response = await responseEngine.generateResponse({
     tenantId,
     conversationId: conversation.id,
@@ -144,6 +144,7 @@ async function processInboundMessage(
     intent: intentResult.intent,
     confidence: intentResult.confidence,
     messageText,
+    extractedQuery: intentResult.extractedQuery,
   });
 
   // Step 13: Outbound message is persisted inside responseEngine

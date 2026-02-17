@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { MESSAGE_DIRECTION, MESSAGE_STATUS } from '@whatsapp-bot/shared';
 
@@ -35,7 +36,7 @@ export async function createInbound(params: {
       direction: MESSAGE_DIRECTION.INBOUND,
       type: params.type,
       body: params.body || null,
-      metadata: params.metadata as object || null,
+      metadata: params.metadata ? (params.metadata as Prisma.InputJsonValue) : Prisma.JsonNull,
       intent: params.intent || null,
       confidence: params.confidence || null,
       status: MESSAGE_STATUS.RECEIVED,
@@ -54,6 +55,7 @@ export async function createOutbound(params: {
   waMessageId?: string;
   intent?: string;
   sentBy?: string;
+  metadata?: object;
 }) {
   return prisma.message.create({
     data: {
@@ -65,6 +67,7 @@ export async function createOutbound(params: {
       waMessageId: params.waMessageId || null,
       intent: params.intent || null,
       sentBy: params.sentBy || null,
+      metadata: params.metadata ? (params.metadata as Prisma.InputJsonValue) : Prisma.JsonNull,
       status: params.waMessageId ? MESSAGE_STATUS.SENT : MESSAGE_STATUS.FAILED,
     },
   });

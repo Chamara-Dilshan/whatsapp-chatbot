@@ -1,0 +1,12 @@
+
+> @whatsapp-bot/api@1.0.0 dev D:\Projects\whatsapp-chatbot\apps\api
+> tsx watch src/server.ts
+
+[2026-02-17 22:24:15.814 +0530] [31mERROR[39m (45984): [36mUncaught Exception[39m
+    error: {
+      "code": "EADDRINUSE",
+      "errno": -4091,
+      "syscall": "listen",
+      "address": "::",
+      "port": 4000
+    }

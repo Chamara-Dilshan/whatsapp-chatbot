@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { registerSchema, loginSchema } from '../schemas/auth.schema';
 import { connectWhatsAppSchema, updateCatalogSchema } from '../schemas/tenant.schema';
-import { createProductSchema, updateProductSchema, productQuerySchema } from '../schemas/product.schema';
+import { createProductSchema, updateProductSchema, productQuerySchema, csvImportResultSchema } from '../schemas/product.schema';
 import { updatePoliciesSchema } from '../schemas/policy.schema';
 import { createTemplateSchema, updateTemplateSchema } from '../schemas/template.schema';
 import { conversationQuerySchema, replySchema, assignSchema } from '../schemas/conversation.schema';
@@ -20,6 +20,7 @@ export type UpdateCatalogInput = z.infer<typeof updateCatalogSchema>;
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;
 export type ProductQueryInput = z.infer<typeof productQuerySchema>;
+export type CsvImportResult = z.infer<typeof csvImportResultSchema>;
 
 // Policy
 export type UpdatePoliciesInput = z.infer<typeof updatePoliciesSchema>;

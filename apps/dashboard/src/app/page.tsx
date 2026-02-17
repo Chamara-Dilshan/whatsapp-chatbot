@@ -1,4 +1,23 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '../contexts/AuthContext';
+
 export default function HomePage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading) {
+      if (user) {
+        router.push('/dashboard');
+      } else {
+        router.push('/login');
+      }
+    }
+  }, [user, loading, router]);
+
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="text-center">
@@ -7,17 +26,8 @@ export default function HomePage() {
           WhatsApp Bot Dashboard
         </h1>
         <p className="mb-8 text-gray-600">
-          Multi-tenant WhatsApp Business Support Bot SaaS
+          Loading...
         </p>
-        <div className="space-x-4">
-          <a
-            href="/login"
-            className="inline-block rounded-lg bg-primary-500 px-6 py-3 font-medium text-white hover:bg-primary-600 transition-colors"
-          >
-            Login
-          </a>
-        </div>
-        <p className="mt-6 text-sm text-gray-400">Phase 1 - Foundation Setup Complete</p>
       </div>
     </div>
   );

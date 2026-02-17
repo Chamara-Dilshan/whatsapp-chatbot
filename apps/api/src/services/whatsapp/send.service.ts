@@ -111,7 +111,7 @@ export async function sendText(params: {
 }
 
 /**
- * Send an interactive list message. (Stub - expanded in Phase 3)
+ * Send an interactive list message via WhatsApp.
  */
 export async function sendInteractiveList(params: {
   tenantId: string;
@@ -143,18 +143,20 @@ export async function sendInteractiveList(params: {
 }
 
 /**
- * Send a single product message. (Stub - expanded in Phase 3)
+ * Send a single product message via WhatsApp catalog.
+ * Falls back to a text message with product details if no catalog is configured.
  */
 export async function sendProductMessage(params: {
   tenantId: string;
   toWaId: string;
-  catalogId: string;
+  catalogId?: string;
   productRetailerId: string;
   bodyText: string;
 }): Promise<{ success: boolean; waMessageId?: string; error?: string }> {
   const config = await getTenantConfig(params.tenantId);
+  const catalogId = params.catalogId || config.catalogId;
 
-  if (!config.catalogId && !params.catalogId) {
+  if (!catalogId) {
     // Fallback: send as text if no catalog configured
     return sendText({
       tenantId: params.tenantId,
@@ -171,10 +173,63 @@ export async function sendProductMessage(params: {
       type: 'product',
       body: { text: params.bodyText },
       action: {
-        catalog_id: params.catalogId || config.catalogId!,
+        catalog_id: catalogId,
         product_retailer_id: params.productRetailerId,
       },
     },
+  };
+
+  return callWhatsAppAPI(config.phoneNumberId, config.accessToken, payload);
+}
+
+/**
+ * Send a multi-product selection list via WhatsApp interactive list message.
+ * Users can pick from a scrollable list which triggers a list_reply webhook.
+ */
+export async function sendProductSelectionList(params: {
+  tenantId: string;
+  toWaId: string;
+  headerText?: string;
+  bodyText: string;
+  footerText?: string;
+  buttonText?: string;
+  sections: Array<{
+    title: string;
+    rows: Array<{ id: string; title: string; description?: string }>;
+  }>;
+}): Promise<{ success: boolean; waMessageId?: string; error?: string }> {
+  const config = await getTenantConfig(params.tenantId);
+
+  // WhatsApp interactive list limits:
+  // Max 10 rows total, 10 sections, row title 24 chars, description 72 chars
+  const interactive: Record<string, unknown> = {
+    type: 'list',
+    body: { text: params.bodyText.substring(0, 1024) },
+    action: {
+      button: (params.buttonText || 'View Products').substring(0, 20),
+      sections: params.sections.map((section) => ({
+        title: section.title.substring(0, 24),
+        rows: section.rows.map((row) => ({
+          id: row.id.substring(0, 200),
+          title: row.title.substring(0, 24),
+          description: row.description?.substring(0, 72),
+        })),
+      })),
+    },
+  };
+
+  if (params.headerText) {
+    interactive.header = { type: 'text', text: params.headerText.substring(0, 60) };
+  }
+  if (params.footerText) {
+    interactive.footer = { text: params.footerText.substring(0, 60) };
+  }
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    to: params.toWaId,
+    type: 'interactive',
+    interactive,
   };
 
   return callWhatsAppAPI(config.phoneNumberId, config.accessToken, payload);
