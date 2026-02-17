@@ -119,9 +119,7 @@ whatsapp-chatbot/
 ├── packages/
 │   └── shared/                 # Shared types & constants
 │
-├── docs/                       # Documentation
-│   ├── PHASE4_SUMMARY.md      # Complete feature guide
-│   └── N8N_WORKFLOWS.md       # Automation setup
+├── docs/                      # Documentation
 │
 ├── PLAN.md                    # Development roadmap
 ├── RUNNING.md                 # Detailed setup guide
