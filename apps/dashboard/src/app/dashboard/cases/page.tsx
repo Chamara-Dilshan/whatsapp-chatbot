@@ -301,7 +301,7 @@ export default function CasesPage() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none md:text-base"
+          className="w-auto min-w-[140px] rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none md:min-w-[160px] md:text-base"
         >
           <option value="">All Status</option>
           <option value="open">Open</option>
@@ -313,7 +313,7 @@ export default function CasesPage() {
         <select
           value={priorityFilter}
           onChange={(e) => setPriorityFilter(e.target.value)}
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none md:text-base"
+          className="w-auto min-w-[140px] rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none md:min-w-[160px] md:text-base"
         >
           <option value="">All Priorities</option>
           <option value="low">Low</option>

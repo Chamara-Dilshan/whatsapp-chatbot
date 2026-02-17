@@ -570,9 +570,9 @@ export default function SettingsPage() {
                               },
                             })}
                             disabled={!isAdmin}
-                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            className="h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
-                          <label htmlFor={`day-${day}`} className="w-12 text-sm capitalize text-gray-900">
+                          <label htmlFor={`day-${day}`} className="w-12 shrink-0 text-sm capitalize text-gray-900">
                             {day}
                           </label>
                           <input
@@ -586,9 +586,9 @@ export default function SettingsPage() {
                               },
                             })}
                             disabled={!dayData.enabled || !isAdmin}
-                            className="rounded-md border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-50"
+                            className="w-32 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-50 disabled:text-gray-400"
                           />
-                          <span className="text-sm text-gray-900">to</span>
+                          <span className="shrink-0 text-sm text-gray-600">to</span>
                           <input
                             type="time"
                             value={dayData.close}
@@ -600,7 +600,7 @@ export default function SettingsPage() {
                               },
                             })}
                             disabled={!dayData.enabled || !isAdmin}
-                            className="rounded-md border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-50"
+                            className="w-32 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-50 disabled:text-gray-400"
                           />
                         </div>
                       );
@@ -615,7 +615,7 @@ export default function SettingsPage() {
                       value={policiesData.timezone}
                       onChange={(e) => setPoliciesData({ ...policiesData, timezone: e.target.value })}
                       disabled={!isAdmin}
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-50"
+                      className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-50 disabled:text-gray-400"
                     >
                       <option value="UTC">UTC</option>
                       <option value="America/New_York">America/New_York</option>
@@ -740,7 +740,7 @@ export default function SettingsPage() {
                     type="text"
                     value={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/automation/webhook`}
                     readOnly
-                    className="flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm"
+                    className="flex-1 overflow-hidden text-ellipsis rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900"
                   />
                   <button
                     onClick={() => {
@@ -749,7 +749,7 @@ export default function SettingsPage() {
                       );
                       alert('Copied to clipboard!');
                     }}
-                    className="rounded-md bg-gray-200 px-3 py-2 text-sm text-gray-900 hover:bg-gray-300"
+                    className="shrink-0 rounded-md bg-gray-200 px-3 py-2 text-sm text-gray-900 hover:bg-gray-300"
                   >
                     Copy
                   </button>

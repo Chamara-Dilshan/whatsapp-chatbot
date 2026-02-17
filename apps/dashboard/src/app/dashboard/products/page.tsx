@@ -298,7 +298,7 @@ export default function ProductsPage() {
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none md:text-base"
+            className="w-auto min-w-[140px] rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none md:min-w-[180px] md:text-base"
           >
             <option value="">All Categories</option>
             {categories.map((cat) => (
@@ -311,7 +311,7 @@ export default function ProductsPage() {
           <select
             value={inStockFilter === undefined ? '' : inStockFilter ? 'true' : 'false'}
             onChange={(e) => setInStockFilter(e.target.value === '' ? undefined : e.target.value === 'true')}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none md:text-base"
+            className="w-auto min-w-[140px] rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none md:min-w-[180px] md:text-base"
           >
             <option value="">All Stock Status</option>
             <option value="true">In Stock</option>
@@ -409,7 +409,7 @@ export default function ProductsPage() {
                       {product.category || '—'}
                     </td>
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                      {product.currency} {product.price.toFixed(2)}
+                      {product.currency} {Number(product.price).toFixed(2)}
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={product.inStock ? 'green' : 'red'}>
@@ -472,7 +472,7 @@ export default function ProductsPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Price:</span>
-                    <span className="font-medium">{product.currency} {product.price.toFixed(2)}</span>
+                    <span className="font-medium">{product.currency} {Number(product.price).toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -564,7 +564,7 @@ export default function ProductsPage() {
           )}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-gray-900">
               Retailer ID <span className="text-red-500">*</span>
             </label>
             <input
@@ -572,12 +572,12 @@ export default function ProductsPage() {
               required
               value={formData.retailerId}
               onChange={(e) => setFormData({ ...formData, retailerId: e.target.value })}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-gray-900">
               Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -586,25 +586,25 @@ export default function ProductsPage() {
               maxLength={255}
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-gray-900">
               Description
             </label>
             <textarea
               rows={3}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-900">
                 Price <span className="text-red-500">*</span>
               </label>
               <input
@@ -614,18 +614,18 @@ export default function ProductsPage() {
                 min="0"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-900">
                 Currency
               </label>
               <select
                 value={formData.currency}
                 onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
               >
                 <option value="USD">USD</option>
                 <option value="EUR">EUR</option>
@@ -636,31 +636,31 @@ export default function ProductsPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-gray-900">
               Image URL
             </label>
             <input
               type="url"
               value={formData.imageUrl}
               onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-gray-900">
               Category
             </label>
             <input
               type="text"
               value={formData.category}
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-gray-900">
               Keywords (comma-separated)
             </label>
             <input
@@ -668,7 +668,7 @@ export default function ProductsPage() {
               value={formData.keywords}
               onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
               placeholder="keyword1, keyword2, keyword3"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
             />
           </div>
 
@@ -680,7 +680,7 @@ export default function ProductsPage() {
               onChange={(e) => setFormData({ ...formData, inStock: e.target.checked })}
               className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
-            <label htmlFor="inStock" className="text-sm font-medium text-gray-700">
+            <label htmlFor="inStock" className="text-sm font-medium text-gray-900">
               In Stock
             </label>
           </div>
