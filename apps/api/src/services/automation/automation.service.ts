@@ -1,5 +1,7 @@
 import { prisma } from '../../lib/prisma';
 import { logger } from '../../lib/logger';
+import { incrementUsage } from '../billing/usage.service';
+import { checkAutomationEnabled } from '../billing/quota.service';
 
 interface CreateAutomationEventInput {
   tenantId: string;
@@ -14,6 +16,13 @@ interface CreateAutomationEventInput {
 export async function createAutomationEvent(input: CreateAutomationEventInput) {
   const { tenantId, eventType, payload } = input;
 
+  // Plan gate: automation is a paid feature
+  const automationEnabled = await checkAutomationEnabled(tenantId);
+  if (!automationEnabled) {
+    logger.warn({ tenantId, eventType }, 'Automation event skipped — feature not enabled on current plan');
+    return null;
+  }
+
   const event = await prisma.automationEvent.create({
     data: {
       tenantId,
@@ -23,6 +32,9 @@ export async function createAutomationEvent(input: CreateAutomationEventInput) {
       nextRetryAt: new Date(), // Ready to dispatch immediately
     },
   });
+
+  // Track automation event usage
+  incrementUsage(tenantId, 'automationEventsCount').catch(() => {});
 
   logger.info({ eventId: event.id, eventType, tenantId }, 'Automation event created');
 

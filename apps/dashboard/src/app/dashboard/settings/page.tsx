@@ -16,7 +16,7 @@ interface Template {
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'policies' | 'templates'>('policies');
+  const [activeTab, setActiveTab] = useState<'policies' | 'templates' | 'language'>('policies');
 
   // WhatsApp state
   const [waStatus, setWaStatus] = useState<any>(null);
@@ -54,6 +54,16 @@ export default function SettingsPage() {
       sun: { enabled: false, open: '09:00', close: '17:00' },
     },
   });
+
+  // Language & Tone state
+  const [langData, setLangData] = useState({
+    defaultLanguage: 'EN',
+    tone: 'FRIENDLY',
+    autoDetectLanguage: false,
+  });
+  const [langSaving, setLangSaving] = useState(false);
+  const [langError, setLangError] = useState<string | null>(null);
+  const [langSuccess, setLangSuccess] = useState(false);
 
   // Templates state
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -161,8 +171,35 @@ export default function SettingsPage() {
           sun: { enabled: !!data.businessHours.sun, ...data.businessHours.sun },
         } : policiesData.businessHours,
       });
+
+      // Also populate language/tone tab
+      setLangData({
+        defaultLanguage: data.defaultLanguage || 'EN',
+        tone: data.tone || 'FRIENDLY',
+        autoDetectLanguage: data.autoDetectLanguage || false,
+      });
     } catch (err: any) {
       console.error('Failed to load policies:', err);
+    }
+  };
+
+  const handleSaveLanguage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLangSaving(true);
+    setLangError(null);
+    setLangSuccess(false);
+    try {
+      await api.updatePolicies({
+        defaultLanguage: langData.defaultLanguage as 'EN' | 'SI' | 'TA',
+        tone: langData.tone as 'FRIENDLY' | 'FORMAL' | 'SHORT',
+        autoDetectLanguage: langData.autoDetectLanguage,
+      });
+      setLangSuccess(true);
+      setTimeout(() => setLangSuccess(false), 3000);
+    } catch (err: any) {
+      setLangError(err.message || 'Failed to save language settings');
+    } finally {
+      setLangSaving(false);
     }
   };
 
@@ -506,6 +543,16 @@ export default function SettingsPage() {
                 >
                   Templates
                 </button>
+                <button
+                  onClick={() => setActiveTab('language')}
+                  className={`border-b-2 px-1 py-2 text-sm font-medium ${
+                    activeTab === 'language'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-800'
+                  }`}
+                >
+                  Language & Tone
+                </button>
               </div>
             </div>
 
@@ -725,6 +772,88 @@ export default function SettingsPage() {
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Language & Tone Tab */}
+            {activeTab === 'language' && (
+              <form onSubmit={handleSaveLanguage} className="space-y-6">
+                {langError && (
+                  <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">{langError}</div>
+                )}
+                {langSuccess && (
+                  <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
+                    Language & tone settings saved successfully!
+                  </div>
+                )}
+
+                {/* Default Language */}
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-900">
+                    Default Language
+                  </label>
+                  <select
+                    value={langData.defaultLanguage}
+                    onChange={(e) => setLangData({ ...langData, defaultLanguage: e.target.value })}
+                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    disabled={!isAdmin}
+                  >
+                    <option value="EN">English (EN)</option>
+                    <option value="SI">Sinhala (SI)</option>
+                    <option value="TA">Tamil (TA)</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Bot will reply in this language unless overridden by detection or customer choice.
+                  </p>
+                </div>
+
+                {/* Tone */}
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-900">Reply Tone</label>
+                  <select
+                    value={langData.tone}
+                    onChange={(e) => setLangData({ ...langData, tone: e.target.value })}
+                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    disabled={!isAdmin}
+                  >
+                    <option value="FRIENDLY">Friendly (warm, emoji-friendly)</option>
+                    <option value="FORMAL">Formal (professional, no emoji)</option>
+                    <option value="SHORT">Short (brief and concise)</option>
+                  </select>
+                </div>
+
+                {/* Auto-detect */}
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="autoDetectLanguage"
+                    checked={langData.autoDetectLanguage}
+                    onChange={(e) =>
+                      setLangData({ ...langData, autoDetectLanguage: e.target.checked })
+                    }
+                    disabled={!isAdmin}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600"
+                  />
+                  <div>
+                    <label htmlFor="autoDetectLanguage" className="block text-sm font-medium text-gray-900">
+                      Auto-detect customer language
+                    </label>
+                    <p className="text-xs text-gray-500">
+                      Detects Sinhala / Tamil from Unicode character ranges and overrides the default language.
+                      Customer can also type "English", "සිංහල", or "தமிழ்" to switch languages.
+                    </p>
+                  </div>
+                </div>
+
+                {isAdmin && (
+                  <button
+                    type="submit"
+                    disabled={langSaving}
+                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {langSaving ? 'Saving...' : 'Save Language Settings'}
+                  </button>
+                )}
+              </form>
             )}
           </div>
 

@@ -2,6 +2,9 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { registerSchema, loginSchema } from '@whatsapp-bot/shared';
 import * as authService from '../services/auth/auth.service';
 import { requireAuth } from '../middleware/requireAuth';
+import { authLimiter } from '../middleware/rateLimiter';
+import { signToken, signRefreshToken, verifyRefreshToken } from '../lib/jwt.util';
+import { UnauthorizedError } from '../middleware/errorHandler';
 
 const router = Router();
 
@@ -15,13 +18,36 @@ router.post('/auth/register', async (req: Request, res: Response, next: NextFunc
   }
 });
 
-router.post('/auth/login', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/auth/login', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const input = loginSchema.parse(req.body);
     const result = await authService.login(input);
-    res.json({ success: true, data: result });
+    // Also issue refresh token alongside the access token
+    const refreshToken = signRefreshToken({
+      userId: result.user.id,
+      tenantId: result.tenant.id,
+      role: result.user.role,
+    });
+    res.json({ success: true, data: { ...result, refreshToken } });
   } catch (err) {
     next(err);
+  }
+});
+
+router.post('/auth/refresh', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) throw new UnauthorizedError('Refresh token required');
+
+    const payload = verifyRefreshToken(refreshToken);
+    const accessToken = signToken({
+      userId: payload.userId,
+      tenantId: payload.tenantId,
+      role: payload.role,
+    });
+    res.json({ success: true, data: { accessToken } });
+  } catch (err) {
+    next(new UnauthorizedError('Invalid or expired refresh token'));
   }
 });
 

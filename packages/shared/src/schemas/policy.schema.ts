@@ -10,4 +10,8 @@ export const updatePoliciesSchema = z.object({
   })).optional(),
   timezone: z.string().default('UTC'),
   autoReplyDelay: z.number().int().min(0).default(0),
+  // Phase 3: language & tone
+  defaultLanguage: z.enum(['EN', 'SI', 'TA']).optional(),
+  tone: z.enum(['FRIENDLY', 'FORMAL', 'SHORT']).optional(),
+  autoDetectLanguage: z.boolean().optional(),
 });

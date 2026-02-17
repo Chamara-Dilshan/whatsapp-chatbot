@@ -1,6 +1,8 @@
 import { prisma } from '../../lib/prisma';
-import { decrypt } from '../../lib/crypto.util';
+import { decryptVersioned } from '../../lib/crypto.keyRotation.util';
 import { logger } from '../../lib/logger';
+import { withExponentialBackoff } from '../../lib/retry.util';
+import { incrementUsage } from '../billing/usage.service';
 import type { SendTextPayload, SendInteractiveListPayload, SendProductPayload } from './types';
 
 const GRAPH_API_VERSION = 'v20.0';
@@ -24,41 +26,57 @@ async function getTenantConfig(tenantId: string): Promise<TenantWaConfig> {
 
   return {
     phoneNumberId: tenantWa.phoneNumberId,
-    accessToken: decrypt(tenantWa.accessTokenEnc),
+    accessToken: decryptVersioned(tenantWa.accessTokenEnc),
     catalogId: tenantWa.catalogId,
   };
 }
 
-async function callWhatsAppAPI(phoneNumberId: string, accessToken: string, body: object): Promise<{ success: boolean; waMessageId?: string; error?: string }> {
+async function callWhatsAppAPI(
+  phoneNumberId: string,
+  accessToken: string,
+  body: object
+): Promise<{ success: boolean; waMessageId?: string; error?: string }> {
   const url = `${GRAPH_API_BASE}/${phoneNumberId}/messages`;
 
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
+  // Wrap with exponential backoff retry (3 attempts, 500ms base)
+  return withExponentialBackoff(
+    async () => {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
 
-    const data = await response.json() as Record<string, unknown>;
+      const data = (await response.json()) as Record<string, unknown>;
 
-    if (!response.ok) {
-      const error = data.error as Record<string, unknown> | undefined;
-      const errorMsg = error?.message as string || `HTTP ${response.status}`;
-      logger.error({ phoneNumberId, status: response.status, error: data.error }, 'WhatsApp API error');
-      return { success: false, error: errorMsg };
-    }
+      if (!response.ok) {
+        const error = data.error as Record<string, unknown> | undefined;
+        const errorMsg = (error?.message as string) || `HTTP ${response.status}`;
+        const errorCode = error?.code as number | undefined;
 
-    const messages = data.messages as Array<{ id: string }> | undefined;
-    const waMessageId = messages?.[0]?.id;
-    logger.info({ phoneNumberId, waMessageId }, 'WhatsApp message sent');
-    return { success: true, waMessageId };
-  } catch (err) {
-    logger.error({ err, phoneNumberId }, 'Failed to call WhatsApp API');
+        // Only retry on transient errors (5xx, rate limit 429, network issues)
+        // Don't retry on 4xx auth/bad request errors
+        if (response.status === 429 || response.status >= 500) {
+          throw new Error(errorMsg); // Will trigger retry
+        }
+
+        logger.error({ phoneNumberId, status: response.status, error: data.error }, 'WhatsApp API error');
+        return { success: false, error: errorMsg };
+      }
+
+      const messages = data.messages as Array<{ id: string }> | undefined;
+      const waMessageId = messages?.[0]?.id;
+      logger.info({ phoneNumberId, waMessageId }, 'WhatsApp message sent');
+      return { success: true, waMessageId };
+    },
+    { maxAttempts: 3, baseDelayMs: 500 }
+  ).catch((err) => {
+    logger.error({ err, phoneNumberId }, 'Failed to send WhatsApp message after retries');
     return { success: false, error: String(err) };
-  }
+  });
 }
 
 /**
@@ -68,6 +86,18 @@ async function callWhatsAppAPI(phoneNumberId: string, accessToken: string, body:
 function checkMessageWindow(windowExpiresAt: Date | null): boolean {
   if (!windowExpiresAt) return false;
   return new Date() < windowExpiresAt;
+}
+
+/**
+ * Check if a customer has opted out of messaging.
+ * Returns true if opted out (should block sending).
+ */
+async function isCustomerOptedOut(tenantId: string, toWaId: string): Promise<boolean> {
+  const customer = await prisma.customer.findUnique({
+    where: { tenantId_waId: { tenantId, waId: toWaId } },
+    select: { optedOut: true },
+  });
+  return customer?.optedOut ?? false;
 }
 
 /**
@@ -82,6 +112,12 @@ export async function sendText(params: {
 }): Promise<{ success: boolean; waMessageId?: string; error?: string }> {
   const { tenantId, toWaId, text, conversationId, isTemplate } = params;
 
+  // Opt-out guard: never send to opted-out customers
+  if (await isCustomerOptedOut(tenantId, toWaId)) {
+    logger.warn({ tenantId, toWaId }, 'Blocked send: customer is opted out');
+    return { success: false, error: 'Customer has opted out' };
+  }
+
   // 24h window check (if we have a conversation)
   if (conversationId && !isTemplate) {
     const conversation = await prisma.conversation.findUnique({
@@ -90,11 +126,8 @@ export async function sendText(params: {
     });
 
     if (conversation && !checkMessageWindow(conversation.windowExpiresAt)) {
-      logger.warn({ tenantId, conversationId, toWaId }, '24h messaging window expired. Use template message.');
-      // Structure for template-only mode after 24h:
-      // In production, you would send a pre-approved template instead.
-      // For now, we log and block.
-      return { success: false, error: '24h messaging window expired. Template message required.' };
+      logger.warn({ tenantId, conversationId, toWaId }, '24h messaging window expired. Use sendTemplate().');
+      return { success: false, error: 'window_expired' };
     }
   }
 
@@ -107,7 +140,64 @@ export async function sendText(params: {
     text: { body: text },
   };
 
-  return callWhatsAppAPI(config.phoneNumberId, config.accessToken, payload);
+  const result = await callWhatsAppAPI(config.phoneNumberId, config.accessToken, payload);
+  if (result.success) {
+    incrementUsage(tenantId, 'outboundMessagesCount').catch(() => {});
+  }
+  return result;
+}
+
+/**
+ * Send a pre-approved WhatsApp template message.
+ * Use this when the 24h messaging window has expired or for proactive outreach.
+ *
+ * @param params.templateName - Pre-approved template name as registered in Meta Business Manager
+ * @param params.languageCode - BCP 47 language code (e.g. "en", "si", "ta")
+ * @param params.parameters - Body component variable values ({{1}}, {{2}}, ...)
+ */
+export async function sendTemplate(params: {
+  tenantId: string;
+  toWaId: string;
+  templateName: string;
+  languageCode?: string;
+  parameters?: Array<{ type: 'text'; text: string }>;
+}): Promise<{ success: boolean; waMessageId?: string; error?: string }> {
+  const { tenantId, toWaId, templateName, languageCode = 'en', parameters } = params;
+
+  // Opt-out guard
+  if (await isCustomerOptedOut(tenantId, toWaId)) {
+    logger.warn({ tenantId, toWaId }, 'Blocked template send: customer is opted out');
+    return { success: false, error: 'Customer has opted out' };
+  }
+
+  const config = await getTenantConfig(tenantId);
+
+  const payload: Record<string, unknown> = {
+    messaging_product: 'whatsapp',
+    to: toWaId,
+    type: 'template',
+    template: {
+      name: templateName,
+      language: { code: languageCode },
+      ...(parameters && parameters.length > 0
+        ? {
+            components: [
+              {
+                type: 'body',
+                parameters,
+              },
+            ],
+          }
+        : {}),
+    },
+  };
+
+  logger.info({ tenantId, toWaId, templateName, languageCode }, 'Sending WhatsApp template message');
+  const result = await callWhatsAppAPI(config.phoneNumberId, config.accessToken, payload);
+  if (result.success) {
+    incrementUsage(tenantId, 'outboundMessagesCount').catch(() => {});
+  }
+  return result;
 }
 
 /**
@@ -123,6 +213,11 @@ export async function sendInteractiveList(params: {
     rows: Array<{ id: string; title: string; description?: string }>;
   }>;
 }): Promise<{ success: boolean; waMessageId?: string; error?: string }> {
+  // Opt-out guard
+  if (await isCustomerOptedOut(params.tenantId, params.toWaId)) {
+    return { success: false, error: 'Customer has opted out' };
+  }
+
   const config = await getTenantConfig(params.tenantId);
 
   const payload: SendInteractiveListPayload = {
@@ -153,11 +248,14 @@ export async function sendProductMessage(params: {
   productRetailerId: string;
   bodyText: string;
 }): Promise<{ success: boolean; waMessageId?: string; error?: string }> {
+  if (await isCustomerOptedOut(params.tenantId, params.toWaId)) {
+    return { success: false, error: 'Customer has opted out' };
+  }
+
   const config = await getTenantConfig(params.tenantId);
   const catalogId = params.catalogId || config.catalogId;
 
   if (!catalogId) {
-    // Fallback: send as text if no catalog configured
     return sendText({
       tenantId: params.tenantId,
       toWaId: params.toWaId,
@@ -184,7 +282,6 @@ export async function sendProductMessage(params: {
 
 /**
  * Send a multi-product selection list via WhatsApp interactive list message.
- * Users can pick from a scrollable list which triggers a list_reply webhook.
  */
 export async function sendProductSelectionList(params: {
   tenantId: string;
@@ -198,10 +295,12 @@ export async function sendProductSelectionList(params: {
     rows: Array<{ id: string; title: string; description?: string }>;
   }>;
 }): Promise<{ success: boolean; waMessageId?: string; error?: string }> {
+  if (await isCustomerOptedOut(params.tenantId, params.toWaId)) {
+    return { success: false, error: 'Customer has opted out' };
+  }
+
   const config = await getTenantConfig(params.tenantId);
 
-  // WhatsApp interactive list limits:
-  // Max 10 rows total, 10 sections, row title 24 chars, description 72 chars
   const interactive: Record<string, unknown> = {
     type: 'list',
     body: { text: params.bodyText.substring(0, 1024) },

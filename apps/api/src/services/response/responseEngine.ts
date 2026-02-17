@@ -7,6 +7,9 @@ import * as productSearchService from '../product/productSearch.service';
 import * as productService from '../product/product.service';
 import * as caseService from '../case/case.service';
 import * as automationService from '../automation/automation.service';
+import { renderTemplate, buildVariables } from '../template/templateRender.service';
+import type { SupportedLanguage } from '../language/language.service';
+import { handleOrderStatusInquiry } from '../order/orderBot.service';
 import { logger } from '../../lib/logger';
 
 interface ResponseContext {
@@ -54,17 +57,17 @@ export async function generateResponse(ctx: ResponseContext): Promise<ResponseRe
     return handleProductInquiry(ctx);
   }
 
-  // Look up reply template for this tenant + intent
-  const template = await prisma.replyTemplate.findUnique({
-    where: { tenantId_intent: { tenantId, intent } },
-  });
+  // Order status inquiry
+  if (intent === INTENTS.ORDER_STATUS) {
+    return handleOrderStatus(ctx);
+  }
+
+  // Look up reply template with language/tone fallback chain
+  const template = await findTemplate(tenantId, intent, conversationId);
 
   let replyText: string;
-  if (template && template.isActive) {
-    // Substitute simple placeholders
-    replyText = template.body;
-    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
-    replyText = replyText.replace(/\{\{tenantName\}\}/g, tenant?.name || 'Our Store');
+  if (template) {
+    replyText = await renderTemplateForConversation(template.body, tenantId, conversationId);
   } else {
     // Default fallback
     replyText = "Thanks for your message! How can I help you today? Type \"agent\" to speak with a human.";
@@ -88,6 +91,34 @@ export async function generateResponse(ctx: ResponseContext): Promise<ResponseRe
   });
 
   // Update conversation outbound timestamp
+  await conversationService.onOutboundMessage(conversationId);
+
+  return { replied: true, handoff: false, replyText };
+}
+
+/**
+ * Handle order status inquiry using orderBot service.
+ */
+async function handleOrderStatus(ctx: ResponseContext): Promise<ResponseResult> {
+  const { tenantId, conversationId, customerWaId, extractedQuery } = ctx;
+
+  const { replyText } = await handleOrderStatusInquiry(tenantId, customerWaId, extractedQuery);
+
+  const sendResult = await sendService.sendText({
+    tenantId,
+    toWaId: customerWaId,
+    text: replyText,
+    conversationId,
+  });
+
+  await messageService.createOutbound({
+    tenantId,
+    conversationId,
+    body: replyText,
+    waMessageId: sendResult.waMessageId,
+    intent: INTENTS.ORDER_STATUS,
+  });
+
   await conversationService.onOutboundMessage(conversationId);
 
   return { replied: true, handoff: false, replyText };
@@ -145,8 +176,9 @@ async function handleProductInquiry(ctx: ResponseContext): Promise<ResponseResul
 
   if (products.length === 0) {
     // No products found
-    const template = await prisma.replyTemplate.findUnique({
-      where: { tenantId_intent: { tenantId, intent: INTENTS.PRODUCT_INQUIRY } },
+    const template = await prisma.replyTemplate.findFirst({
+      where: { tenantId, intent: INTENTS.PRODUCT_INQUIRY, isActive: true },
+      orderBy: [{ language: 'asc' }, { tone: 'asc' }],
     });
 
     const replyText = template?.body
@@ -236,12 +268,12 @@ async function handleHandoff(ctx: ResponseContext): Promise<ResponseResult> {
   // Set conversation to NEEDS_AGENT
   await conversationService.setNeedsAgent(conversationId);
 
-  // Look up the handoff template
-  const template = await prisma.replyTemplate.findUnique({
-    where: { tenantId_intent: { tenantId, intent: INTENTS.SPEAK_TO_HUMAN } },
-  });
-
-  const handoffText = template?.body || "I'm connecting you with a human agent. Please hold on, someone will be with you shortly.";
+  // Look up the handoff template with language/tone fallback chain
+  const template = await findTemplate(tenantId, INTENTS.SPEAK_TO_HUMAN, conversationId);
+  const rawHandoffText = template?.body || "I'm connecting you with a human agent. Please hold on, someone will be with you shortly.";
+  const handoffText = template
+    ? await renderTemplateForConversation(rawHandoffText, tenantId, conversationId)
+    : rawHandoffText;
 
   // Send handoff message
   const sendResult = await sendService.sendText({
@@ -302,4 +334,86 @@ async function handleHandoff(ctx: ResponseContext): Promise<ResponseResult> {
   }
 
   return { replied: true, handoff: true, replyText: handoffText };
+}
+
+// ── Language/Tone helpers ─────────────────────────────────────────────────
+
+/**
+ * Find the best matching template for a given intent + conversation language/tone.
+ * Fallback chain: (lang, tone) → (EN, tone) → (lang, FRIENDLY) → (EN, FRIENDLY) → any active
+ */
+async function findTemplate(tenantId: string, intent: string, conversationId: string) {
+  // Get conversation language and tenant tone preference
+  const [conv, policies] = await Promise.all([
+    prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: { language: true },
+    }),
+    prisma.tenantPolicies.findUnique({
+      where: { tenantId },
+      select: { tone: true },
+    }),
+  ]);
+
+  const lang = (conv?.language as SupportedLanguage) ?? 'EN';
+  const tone = policies?.tone ?? 'FRIENDLY';
+
+  // Ordered fallback candidates
+  const candidates = [
+    { language: lang, tone },
+    { language: 'EN', tone },
+    { language: lang, tone: 'FRIENDLY' },
+    { language: 'EN', tone: 'FRIENDLY' },
+  ];
+
+  for (const candidate of candidates) {
+    const t = await prisma.replyTemplate.findUnique({
+      where: {
+        tenantId_intent_language_tone: {
+          tenantId,
+          intent,
+          language: candidate.language,
+          tone: candidate.tone,
+        },
+      },
+    });
+    if (t && t.isActive) return t;
+  }
+
+  // Last resort: any active template for this intent
+  return prisma.replyTemplate.findFirst({
+    where: { tenantId, intent, isActive: true },
+  });
+}
+
+/**
+ * Render a template body with variables sourced from conversation/tenant context.
+ */
+async function renderTemplateForConversation(
+  body: string,
+  tenantId: string,
+  conversationId: string
+): Promise<string> {
+  const [tenant, policies, conv] = await Promise.all([
+    prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } }),
+    prisma.tenantPolicies.findUnique({
+      where: { tenantId },
+      select: { timezone: true, shippingPolicy: true, returnPolicy: true, businessHours: true },
+    }),
+    prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { customer: { select: { name: true } } },
+    }),
+  ]);
+
+  const variables = buildVariables({
+    customerName: conv?.customer?.name,
+    businessName: tenant?.name ?? '',
+    timezone: policies?.timezone ?? 'UTC',
+    shippingPolicy: policies?.shippingPolicy,
+    returnPolicy: policies?.returnPolicy,
+    businessHours: policies?.businessHours as Record<string, { open: string; close: string }> | null,
+  });
+
+  return renderTemplate(body, variables);
 }

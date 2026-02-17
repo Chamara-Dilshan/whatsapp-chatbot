@@ -3,6 +3,7 @@ import { env } from './config/env';
 import { logger } from './lib/logger';
 import { prisma } from './lib/prisma';
 import { dispatcher } from './services/automation/dispatcher';
+import { startWebhookWorker, stopWebhookWorker } from './services/queue/webhook.worker';
 
 const app = createApp();
 
@@ -12,14 +13,18 @@ const server = app.listen(env.API_PORT, () => {
 
   // Start automation dispatcher (polls every 30 seconds)
   dispatcher.start(30);
+
+  // Start BullMQ webhook worker (runs in-process)
+  startWebhookWorker();
 });
 
 // Graceful shutdown
 const shutdown = async (signal: string) => {
   logger.info(`${signal} received. Shutting down gracefully...`);
 
-  // Stop dispatcher
+  // Stop workers
   dispatcher.stop();
+  await stopWebhookWorker();
 
   server.close(async () => {
     await prisma.$disconnect();

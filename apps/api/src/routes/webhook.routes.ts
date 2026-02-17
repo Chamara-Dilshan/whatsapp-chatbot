@@ -1,6 +1,6 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response } from 'express';
 import { env } from '../config/env';
-import { processWebhook } from '../services/whatsapp/webhook.service';
+import { enqueueWebhook } from '../services/queue/webhook.queue';
 import { verifyMetaSignature } from '../middleware/signatureVerify';
 import { logger } from '../lib/logger';
 
@@ -27,17 +27,26 @@ router.get('/webhook/whatsapp', (req: Request, res: Response) => {
 
 /**
  * POST /webhook/whatsapp - Receive inbound messages from WhatsApp.
- * Always returns 200 to prevent WhatsApp from retrying.
+ *
+ * Returns 200 immediately (<50ms) and enqueues processing to BullMQ.
+ * The webhook worker handles actual message processing asynchronously.
+ *
+ * Per WhatsApp docs: always return 200 or they will retry indefinitely.
  */
 router.post('/webhook/whatsapp', verifyMetaSignature, async (req: Request, res: Response) => {
-  // Return 200 immediately to WhatsApp
+  // Return 200 to WhatsApp immediately — this is critical for reliability
   res.status(200).json({ status: 'received' });
 
-  // Process asynchronously (after response is sent)
+  // Enqueue for async processing
   try {
-    await processWebhook(req.body, req.requestId);
+    await enqueueWebhook({
+      payload: req.body,
+      requestId: req.requestId,
+    });
   } catch (err) {
-    logger.error({ err, requestId: req.requestId }, 'Webhook processing failed');
+    // Enqueue failure is non-fatal for the HTTP response (already sent 200)
+    // The message will be retried if the queue is temporarily unavailable
+    logger.error({ err, requestId: req.requestId }, 'Failed to enqueue webhook job');
   }
 });
 

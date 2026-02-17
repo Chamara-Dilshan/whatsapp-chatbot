@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAutomationKey } from '../middleware/requireAutomationKey';
 import * as automationService from '../services/automation/automation.service';
+import * as sendService from '../services/whatsapp/send.service';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -99,6 +100,38 @@ router.post('/automation/webhook/n8n', requireAutomationKey, async (req, res, ne
     }
 
     res.json({ success: true, message: 'Webhook received' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /automation/actions/send-template
+ * Send a pre-approved WhatsApp template message (used by n8n post-delivery flows).
+ * Requires: automation API key header.
+ */
+router.post('/automation/actions/send-template', requireAutomationKey, async (req, res, next) => {
+  try {
+    const { tenantId, toWaId, templateName, languageCode, parameters } = req.body;
+
+    if (!tenantId || !toWaId || !templateName) {
+      return res.status(400).json({ error: 'tenantId, toWaId, and templateName are required' });
+    }
+
+    const result = await sendService.sendTemplate({
+      tenantId,
+      toWaId,
+      templateName,
+      languageCode: languageCode || 'en',
+      parameters: parameters || [],
+    });
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || 'Failed to send template' });
+    }
+
+    logger.info({ tenantId, toWaId, templateName }, 'Template sent via automation action');
+    res.json({ success: true, waMessageId: result.waMessageId });
   } catch (error) {
     next(error);
   }

@@ -94,7 +94,7 @@ router.post('/inbox/:conversationId/assign', requireAuth, async (req, res, next)
 router.post('/inbox/:conversationId/reply', requireAuth, async (req, res, next) => {
   try {
     const tenantId = req.auth!.tenantId;
-    const agentUserId = req.auth!.id;
+    const agentUserId = req.auth!.userId;
     const { conversationId } = req.params;
     const { message } = req.body;
 

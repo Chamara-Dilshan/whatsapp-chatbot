@@ -7,6 +7,7 @@ import { requestIdMiddleware } from './middleware/requestId';
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFound';
 import { captureRawBody } from './middleware/rawBody';
+import { apiLimiter } from './middleware/rateLimiter';
 import routes from './routes';
 import { logger } from './lib/logger';
 
@@ -37,6 +38,12 @@ export function createApp() {
 
   // Compression
   app.use(compression());
+
+  // General API rate limiting (skips /webhook/whatsapp to avoid blocking Meta)
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/webhook/')) return next();
+    return apiLimiter(req, res, next);
+  });
 
   // Routes
   app.use(routes);

@@ -32,7 +32,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Inbox', href: '/dashboard/inbox', icon: '📥' },
     { name: 'Cases', href: '/dashboard/cases', icon: '📋' },
     { name: 'Products', href: '/dashboard/products', icon: '🏷️' },
+    { name: 'Orders', href: '/dashboard/orders', icon: '📦' },
     { name: 'Analytics', href: '/dashboard/analytics', icon: '📊' },
+    { name: 'Billing', href: '/dashboard/billing', icon: '💳' },
     { name: 'Settings', href: '/dashboard/settings', icon: '⚙️' },
   ];
 

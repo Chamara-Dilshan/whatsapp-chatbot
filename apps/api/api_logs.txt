@@ -10,3 +10,12 @@
       "address": "::",
       "port": 4000
     }
+3:05:03 AM [tsx] change in ./src\server.ts Rerunning...
+c[2026-02-18 03:05:05.485 +0530] [31mERROR[39m (120096): [36mUncaught Exception[39m
+    error: {
+      "code": "EADDRINUSE",
+      "errno": -4091,
+      "syscall": "listen",
+      "address": "::",
+      "port": 4000
+    }

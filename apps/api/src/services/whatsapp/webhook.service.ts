@@ -7,6 +7,9 @@ import * as messageService from '../message/message.service';
 import * as intentEngine from '../intent/intentEngine';
 import * as responseEngine from '../response/responseEngine';
 import * as sendService from './send.service';
+import { incrementUsage } from '../billing/usage.service';
+import { checkInboundQuota } from '../billing/quota.service';
+import { resolveLanguage } from '../language/language.service';
 import { logger } from '../../lib/logger';
 import type { WebhookPayload } from './types';
 
@@ -98,7 +101,53 @@ async function processInboundMessage(
   await conversationService.onInboundMessage(conversation.id);
   Object.assign(logCtx, { conversationId: conversation.id });
 
-  // Step 9: Persist inbound message
+  // Step 8b: Language detection/resolution (best-effort — don't fail pipeline)
+  if (messageText) {
+    resolveLanguage(tenantId, conversation.id, messageText).catch((err) => {
+      logger.warn({ err, conversationId: conversation.id }, 'Language resolution failed');
+    });
+  }
+
+  // Step 9: Inbound quota check
+  const quota = await checkInboundQuota(tenantId);
+  if (!quota.allowed) {
+    // Store the message but escalate to agent (billing limit reached)
+    await messageService.createInbound({
+      tenantId,
+      conversationId: conversation.id,
+      customerId: customer.id,
+      waMessageId: msg.waMessageId,
+      type: msg.type,
+      body: messageText || undefined,
+      metadata: msg.rawPayload as object,
+    });
+    await conversationService.setNeedsAgent(conversation.id);
+
+    // Send limit warning to customer
+    const limitText =
+      "We're currently experiencing high message volume. A team member will respond to you shortly.";
+    try {
+      await sendService.sendText({
+        tenantId,
+        toWaId: msg.customerWaId,
+        text: limitText,
+        conversationId: conversation.id,
+      });
+    } catch {
+      // Best-effort — don't fail the pipeline
+    }
+
+    logger.warn(
+      { ...logCtx, used: quota.used, limit: quota.limit },
+      'Inbound quota exceeded — escalated to agent'
+    );
+    return;
+  }
+
+  // Track inbound usage
+  await incrementUsage(tenantId, 'inboundMessagesCount');
+
+  // Step 9b: Persist inbound message
   const inboundMsg = await messageService.createInbound({
     tenantId,
     conversationId: conversation.id,

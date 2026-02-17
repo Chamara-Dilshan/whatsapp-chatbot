@@ -1,82 +1,77 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
-import { decrypt } from '../lib/crypto.util';
+import { decryptVersioned } from '../lib/crypto.keyRotation.util';
 import { computeHmacSha256, timingSafeCompare } from '../lib/crypto.util';
 import { extractPhoneNumberIdFromRaw } from '../services/whatsapp/parser';
 import { logger } from '../lib/logger';
 
 /**
- * Middleware to verify X-Hub-Signature-256 header on WhatsApp webhook POST.
+ * Strict webhook signature verification middleware.
  *
- * Challenge: The app secret is tenant-specific, but we only know the tenant
- * after parsing the body. We solve this by:
- * 1. Using req.rawBody (captured by rawBody.ts verify callback)
- * 2. Extracting phone_number_id via regex (minimal parse)
- * 3. Loading tenant's appSecretEnc from DB and decrypting
- * 4. Computing and comparing HMAC
- *
- * For MVP: If tenant is not found, we skip validation but log a warning.
- * In production: Remove the skip and return 401 when tenant is not found.
+ * Security rules:
+ * - Unknown phone_number_id → return 200 (log warning, don't process — WhatsApp spec compliance)
+ * - Known tenant + INVALID signature → return 403 Forbidden
+ * - Known tenant + VALID signature → call next()
+ * - Missing signature header → return 403 Forbidden
+ * - Missing raw body → return 403 Forbidden
  */
 export async function verifyMetaSignature(
   req: Request,
-  _res: Response,
+  res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
     const signature = req.headers['x-hub-signature-256'] as string | undefined;
 
     if (!signature) {
-      // In production, reject requests without signature:
-      // return next(new UnauthorizedError('Missing X-Hub-Signature-256 header'));
-      logger.warn({ requestId: req.requestId }, 'Webhook received without X-Hub-Signature-256 header');
-      next();
+      logger.warn({ requestId: req.requestId }, 'Webhook rejected: missing X-Hub-Signature-256');
+      res.status(403).json({ error: 'Missing signature header' });
       return;
     }
 
     if (!req.rawBody) {
-      logger.warn({ requestId: req.requestId }, 'Raw body not captured for signature verification');
-      next();
+      logger.warn({ requestId: req.requestId }, 'Webhook rejected: raw body not captured');
+      res.status(403).json({ error: 'Raw body unavailable' });
       return;
     }
 
-    // Extract phone_number_id from raw body
+    // Extract phone_number_id (minimal parse, no JSON.parse overhead)
     const phoneNumberId = extractPhoneNumberIdFromRaw(req.rawBody);
     if (!phoneNumberId) {
-      logger.warn({ requestId: req.requestId }, 'Could not extract phone_number_id from webhook payload');
-      next();
+      logger.warn({ requestId: req.requestId }, 'Could not extract phone_number_id — returning 200 (no processing)');
+      // Per WhatsApp spec: always return 200 to prevent retries flooding from unknown sources
+      res.status(200).json({ status: 'ok' });
       return;
     }
 
-    // Load tenant's app secret
+    // Load tenant's encrypted app secret
     const tenantWa = await prisma.tenantWhatsApp.findUnique({
       where: { phoneNumberId },
       select: { appSecretEnc: true },
     });
 
     if (!tenantWa) {
-      // MVP: Skip validation for unknown tenants
-      // Production: return next(new UnauthorizedError('Unknown phone_number_id'));
-      logger.warn({ phoneNumberId, requestId: req.requestId }, 'Tenant not found for signature verification, skipping');
-      next();
+      // Unknown tenant: return 200 silently (WhatsApp may send probes to old numbers)
+      logger.warn({ phoneNumberId, requestId: req.requestId }, 'Unknown phone_number_id — returning 200, not processing');
+      res.status(200).json({ status: 'ok' });
       return;
     }
 
-    // Decrypt app secret
+    // Decrypt app secret (supports versioned key rotation)
     let appSecret: string;
     try {
-      appSecret = decrypt(tenantWa.appSecretEnc);
-    } catch {
-      logger.error({ phoneNumberId, requestId: req.requestId }, 'Failed to decrypt app secret');
-      next();
+      appSecret = decryptVersioned(tenantWa.appSecretEnc);
+    } catch (err) {
+      logger.error({ phoneNumberId, requestId: req.requestId, err }, 'Failed to decrypt app secret — rejecting webhook');
+      res.status(403).json({ error: 'Signature verification failed' });
       return;
     }
 
-    // Verify signature: sha256=<hex>
+    // Validate signature format: "sha256=<hex>"
     const expectedPrefix = 'sha256=';
     if (!signature.startsWith(expectedPrefix)) {
-      logger.warn({ requestId: req.requestId }, 'Invalid signature format');
-      next();
+      logger.warn({ requestId: req.requestId }, 'Webhook rejected: invalid signature format');
+      res.status(403).json({ error: 'Invalid signature format' });
       return;
     }
 
@@ -84,18 +79,15 @@ export async function verifyMetaSignature(
     const computedHex = computeHmacSha256(req.rawBody, appSecret);
 
     if (!timingSafeCompare(signatureHex, computedHex)) {
-      logger.error({ requestId: req.requestId, phoneNumberId }, 'Webhook signature verification FAILED');
-      // In production, reject:
-      // return next(new UnauthorizedError('Invalid webhook signature'));
-      // For MVP, log and continue:
-      logger.warn({ requestId: req.requestId }, 'Continuing despite signature mismatch (MVP mode)');
-    } else {
-      logger.debug({ requestId: req.requestId, phoneNumberId }, 'Webhook signature verified');
+      logger.error({ requestId: req.requestId, phoneNumberId }, 'Webhook signature MISMATCH — returning 403');
+      res.status(403).json({ error: 'Signature mismatch' });
+      return;
     }
 
+    logger.debug({ requestId: req.requestId, phoneNumberId }, 'Webhook signature verified ✓');
     next();
   } catch (err) {
-    logger.error({ err, requestId: req.requestId }, 'Error during signature verification');
-    next();
+    logger.error({ err, requestId: req.requestId }, 'Unexpected error during signature verification');
+    res.status(403).json({ error: 'Signature verification error' });
   }
 }

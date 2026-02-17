@@ -28,6 +28,10 @@ model Tenant {
   templates        ReplyTemplate[]
   automationEvents AutomationEvent[]
   cases            Case[]
+  subscription     TenantSubscription?
+  usageCounters    UsageCounter[]
+  quotaOverride    TenantQuotaOverride?
+  orders           Order[]
 }
 
 model TenantUser {
@@ -53,8 +57,8 @@ model TenantWhatsApp {
   phoneNumberId      String   @unique
   displayPhone       String
   wabaId             String?
-  accessTokenEnc     String   // Encrypted access token
-  appSecretEnc       String   // Encrypted app secret
+  accessTokenEnc     String   // Encrypted access token (supports key-version prefix)
+  appSecretEnc       String   // Encrypted app secret (supports key-version prefix)
   webhookVerifyToken String
   catalogId          String?
   isActive           Boolean  @default(true)
@@ -82,6 +86,7 @@ model Customer {
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
   conversations Conversation[]
   messages      Message[]
+  orders        Order[]
 
   @@unique([tenantId, waId])
   @@index([tenantId])
@@ -96,6 +101,7 @@ model Conversation {
   phoneNumberId       String
   status              String    @default("bot") // bot | needs_agent | agent | closed
   assignedToUserId    String?
+  language            String?   // EN | SI | TA — detected or customer-set
   lastMessageAt       DateTime?
   lastInboundAt       DateTime?
   lastOutboundAt      DateTime?
@@ -113,6 +119,7 @@ model Conversation {
 
   @@index([tenantId])
   @@index([tenantId, status])
+  @@index([tenantId, status, updatedAt])
   @@index([tenantId, assignedToUserId, status])
   @@index([tenantId, updatedAt])
   @@index([customerId])
@@ -143,6 +150,7 @@ model Message {
   customer     Customer?    @relation(fields: [customerId], references: [id])
 
   @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([conversationId])
   @@index([conversationId, createdAt])
   @@index([waMessageId])
@@ -166,7 +174,8 @@ model Product {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  orderItems OrderItem[]
 
   @@unique([tenantId, retailerId])
   @@index([tenantId])
@@ -177,16 +186,20 @@ model Product {
 // ─── Policies ────────────────────────────────────────────────────────
 
 model TenantPolicies {
-  id             String   @id @default(cuid())
-  tenantId       String   @unique
-  returnPolicy   String?  @db.Text
-  shippingPolicy String?  @db.Text
-  faqContent     String?  @db.Text
-  businessHours  Json? // { mon: { open: "09:00", close: "17:00" }, ... }
-  timezone       String   @default("UTC")
-  autoReplyDelay Int      @default(0) // milliseconds
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  tenantId           String   @unique
+  returnPolicy       String?  @db.Text
+  shippingPolicy     String?  @db.Text
+  faqContent         String?  @db.Text
+  businessHours      Json? // { mon: { open: "09:00", close: "17:00" }, ... }
+  timezone           String   @default("UTC")
+  autoReplyDelay     Int      @default(0) // milliseconds
+  // Language & tone settings
+  defaultLanguage    String   @default("EN")      // EN | SI | TA
+  tone               String   @default("FRIENDLY") // FORMAL | FRIENDLY | SHORT
+  autoDetectLanguage Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 }
@@ -197,6 +210,8 @@ model ReplyTemplate {
   id        String   @id @default(cuid())
   tenantId  String
   intent    String
+  language  String   @default("EN")       // EN | SI | TA
+  tone      String   @default("FRIENDLY") // FORMAL | FRIENDLY | SHORT
   name      String
   body      String   @db.Text
   isActive  Boolean  @default(true)
@@ -205,8 +220,9 @@ model ReplyTemplate {
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
-  @@unique([tenantId, intent])
+  @@unique([tenantId, intent, language, tone])
   @@index([tenantId])
+  @@index([tenantId, language])
 }
 
 // ─── Automation Events ───────────────────────────────────────────────
@@ -254,6 +270,124 @@ model Case {
 
   @@index([tenantId])
   @@index([tenantId, status])
+  @@index([tenantId, status, priority])
   @@index([tenantId, assignedTo, status])
   @@index([conversationId])
+}
+
+// ─── Billing & Subscriptions ─────────────────────────────────────────
+
+model TenantSubscription {
+  id                   String    @id @default(cuid())
+  tenantId             String    @unique
+  plan                 String    @default("free")    // free | pro | business
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  status               String    @default("active")  // active | past_due | canceled | trialing
+  currentPeriodStart   DateTime  @default(now())
+  currentPeriodEnd     DateTime  @default(now())
+  cancelAtPeriodEnd    Boolean   @default(false)
+  canceledAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+model UsageCounter {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  period                String   // "YYYY-MM"
+  inboundMessagesCount  Int      @default(0)
+  outboundMessagesCount Int      @default(0)
+  automationEventsCount Int      @default(0)
+  aiCallsCount          Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, period])
+  @@index([tenantId])
+}
+
+model TenantQuotaOverride {
+  id                 String   @id @default(cuid())
+  tenantId           String   @unique
+  maxAgents          Int?
+  maxInboundPerMonth Int?
+  maxOutboundPerDay  Int?
+  maxProducts        Int?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// ─── Orders & Shipments ──────────────────────────────────────────────
+
+model Order {
+  id            String    @id @default(cuid())
+  tenantId      String
+  orderNumber   String
+  customerId    String?
+  customerPhone String
+  customerName  String?
+  status        String    @default("pending") // pending | processing | shipped | delivered | canceled | refunded
+  subtotal      Decimal   @db.Decimal(10, 2)
+  shippingFee   Decimal   @db.Decimal(10, 2) @default(0)
+  total         Decimal   @db.Decimal(10, 2)
+  currency      String    @default("USD")
+  notes         String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  items    OrderItem[]
+  shipment Shipment?
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, customerPhone])
+  @@index([customerId])
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  tenantId  String
+  orderId   String
+  productId String?
+  title     String
+  quantity  Int      @default(1)
+  unitPrice Decimal  @db.Decimal(10, 2)
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Shipment {
+  id               String    @id @default(cuid())
+  tenantId         String
+  orderId          String    @unique
+  carrier          String?
+  trackingNumber   String?
+  trackingUrl      String?
+  shippedAt        DateTime?
+  deliveredAt      DateTime?
+  latestStatusText String?   @db.Text
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, orderId])
+  @@index([trackingNumber])
 }
