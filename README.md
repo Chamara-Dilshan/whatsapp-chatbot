@@ -121,9 +121,7 @@ whatsapp-chatbot/
 │
 ├── docs/                      # Documentation
 │
-├── PLAN.md                    # Development roadmap
-├── RUNNING.md                 # Detailed setup guide
-└── QUICKSTART.md              # 5-minute setup
+└── PLAN.md                    # Development roadmap
 ```
 
 ## 🛠️ Tech Stack
