@@ -290,14 +290,6 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 4. Verify webhook with token
 5. Start receiving messages
 
-## 📚 Documentation
-
-- **[RUNNING.md](RUNNING.md)** - Complete setup guide
-- **[QUICKSTART.md](QUICKSTART.md)** - 5-minute quick start
-- **[PLAN.md](PLAN.md)** - Project roadmap & phases
-- **[docs/PHASE4_SUMMARY.md](docs/PHASE4_SUMMARY.md)** - Feature documentation
-- **[docs/N8N_WORKFLOWS.md](docs/N8N_WORKFLOWS.md)** - Automation guide
-- **[docs/RESPONSIVE_DESIGN.md](docs/RESPONSIVE_DESIGN.md)** - Mobile-first UI guide
 
 ## 🔒 Security Features
 
