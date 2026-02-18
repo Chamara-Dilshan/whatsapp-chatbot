@@ -10,6 +10,7 @@ import * as automationService from '../automation/automation.service';
 import { renderTemplate, buildVariables } from '../template/templateRender.service';
 import type { SupportedLanguage } from '../language/language.service';
 import { handleOrderStatusInquiry } from '../order/orderBot.service';
+import { generateAIResponse } from '../ai/aiResponse.service';
 import { logger } from '../../lib/logger';
 
 interface ResponseContext {
@@ -21,6 +22,7 @@ interface ResponseContext {
   confidence: number;
   messageText?: string;
   extractedQuery?: string;
+  conversationHistory?: string[];
 }
 
 interface ResponseResult {
@@ -69,8 +71,16 @@ export async function generateResponse(ctx: ResponseContext): Promise<ResponseRe
   if (template) {
     replyText = await renderTemplateForConversation(template.body, tenantId, conversationId);
   } else {
-    // Default fallback
-    replyText = "Thanks for your message! How can I help you today? Type \"agent\" to speak with a human.";
+    // Try AI response generation before falling back to default
+    const aiReply = await generateAIResponse({
+      tenantId,
+      conversationId,
+      intent,
+      messageText: ctx.messageText || '',
+      conversationHistory: ctx.conversationHistory,
+    });
+
+    replyText = aiReply || "Thanks for your message! How can I help you today? Type \"agent\" to speak with a human.";
   }
 
   // Send the reply

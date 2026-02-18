@@ -198,6 +198,8 @@ model TenantPolicies {
   defaultLanguage    String   @default("EN")      // EN | SI | TA
   tone               String   @default("FRIENDLY") // FORMAL | FRIENDLY | SHORT
   autoDetectLanguage Boolean  @default(false)
+  // AI settings
+  aiEnabled          Boolean  @default(false)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -321,6 +323,7 @@ model TenantQuotaOverride {
   maxInboundPerMonth Int?
   maxOutboundPerDay  Int?
   maxProducts        Int?
+  maxAiCallsPerMonth Int?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

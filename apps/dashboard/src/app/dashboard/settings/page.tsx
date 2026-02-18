@@ -16,7 +16,7 @@ interface Template {
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'policies' | 'templates' | 'language'>('policies');
+  const [activeTab, setActiveTab] = useState<'policies' | 'templates' | 'language' | 'ai'>('policies');
 
   // WhatsApp state
   const [waStatus, setWaStatus] = useState<any>(null);
@@ -65,6 +65,13 @@ export default function SettingsPage() {
   const [langError, setLangError] = useState<string | null>(null);
   const [langSuccess, setLangSuccess] = useState(false);
 
+  // AI state
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiSaving, setAiSaving] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiSuccess, setAiSuccess] = useState(false);
+  const [aiUsage, setAiUsage] = useState<{ used: number; limit: number } | null>(null);
+
   // Templates state
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
@@ -87,6 +94,7 @@ export default function SettingsPage() {
     loadWhatsAppStatus();
     loadPolicies();
     loadTemplates();
+    loadAiUsage();
   }, []);
 
   // WhatsApp functions
@@ -178,8 +186,30 @@ export default function SettingsPage() {
         tone: data.tone || 'FRIENDLY',
         autoDetectLanguage: data.autoDetectLanguage || false,
       });
+
+      // Populate AI toggle
+      setAiEnabled(data.aiEnabled || false);
     } catch (err: any) {
       console.error('Failed to load policies:', err);
+    }
+  };
+
+  const loadAiUsage = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/billing/usage`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setAiUsage({
+          used: data.current?.aiCallsCount || 0,
+          limit: data.limits?.maxAiCallsPerMonth || 50,
+        });
+      }
+    } catch {
+      // Best effort
     }
   };
 
@@ -200,6 +230,22 @@ export default function SettingsPage() {
       setLangError(err.message || 'Failed to save language settings');
     } finally {
       setLangSaving(false);
+    }
+  };
+
+  const handleToggleAi = async (enabled: boolean) => {
+    setAiSaving(true);
+    setAiError(null);
+    setAiSuccess(false);
+    try {
+      await api.updatePolicies({ aiEnabled: enabled });
+      setAiEnabled(enabled);
+      setAiSuccess(true);
+      setTimeout(() => setAiSuccess(false), 3000);
+    } catch (err: any) {
+      setAiError(err.message || 'Failed to update AI settings');
+    } finally {
+      setAiSaving(false);
     }
   };
 
@@ -553,6 +599,16 @@ export default function SettingsPage() {
                 >
                   Language & Tone
                 </button>
+                <button
+                  onClick={() => setActiveTab('ai')}
+                  className={`border-b-2 px-1 py-2 text-sm font-medium ${
+                    activeTab === 'ai'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-800'
+                  }`}
+                >
+                  AI
+                </button>
               </div>
             </div>
 
@@ -854,6 +910,85 @@ export default function SettingsPage() {
                   </button>
                 )}
               </form>
+            )}
+            {/* AI Tab */}
+            {activeTab === 'ai' && (
+              <div className="space-y-6">
+                {aiError && (
+                  <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">{aiError}</div>
+                )}
+                {aiSuccess && (
+                  <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
+                    AI settings saved successfully!
+                  </div>
+                )}
+
+                {/* AI Toggle */}
+                <div className="flex items-start gap-3">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={aiEnabled}
+                    onClick={() => !aiSaving && isAdmin && handleToggleAi(!aiEnabled)}
+                    disabled={aiSaving || !isAdmin}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                      aiEnabled ? 'bg-blue-600' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        aiEnabled ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900">
+                      Enable AI-powered responses
+                    </label>
+                    <p className="text-xs text-gray-500">
+                      When enabled, AI will classify unrecognized messages and generate contextual replies
+                      when no template matches. Rules-based detection always runs first (free and fast).
+                    </p>
+                  </div>
+                </div>
+
+                {/* AI Usage */}
+                {aiUsage && (
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-900">
+                      AI Calls This Month
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <div className="h-2.5 flex-1 rounded-full bg-gray-200">
+                        <div
+                          className={`h-2.5 rounded-full transition-all ${
+                            aiUsage.used / aiUsage.limit >= 0.95
+                              ? 'bg-red-500'
+                              : aiUsage.used / aiUsage.limit >= 0.8
+                                ? 'bg-orange-500'
+                                : 'bg-blue-600'
+                          }`}
+                          style={{ width: `${Math.min(100, (aiUsage.used / aiUsage.limit) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="shrink-0 text-sm text-gray-600">
+                        {aiUsage.used} / {aiUsage.limit}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* How it works */}
+                <div className="rounded-md bg-blue-50 p-4">
+                  <p className="text-sm font-medium text-blue-800">How AI works:</p>
+                  <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-blue-700">
+                    <li>Incoming messages are first matched against 8 keyword rules (free, instant)</li>
+                    <li>If no rule matches, AI classifies the intent (uses 1 AI call)</li>
+                    <li>If no template exists for the intent, AI generates a contextual reply (uses 1 AI call)</li>
+                    <li>If AI quota is exhausted, the bot falls back to the default template response</li>
+                  </ol>
+                </div>
+              </div>
             )}
           </div>
 

@@ -14,4 +14,6 @@ export const updatePoliciesSchema = z.object({
   defaultLanguage: z.enum(['EN', 'SI', 'TA']).optional(),
   tone: z.enum(['FRIENDLY', 'FORMAL', 'SHORT']).optional(),
   autoDetectLanguage: z.boolean().optional(),
+  // AI settings
+  aiEnabled: z.boolean().optional(),
 });

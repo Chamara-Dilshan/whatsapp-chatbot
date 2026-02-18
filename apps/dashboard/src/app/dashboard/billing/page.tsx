@@ -5,6 +5,8 @@ import UsageBar from '../../../components/UsageBar';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import Badge from '../../../components/Badge';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface Subscription {
@@ -30,6 +32,8 @@ interface Limits {
   maxProducts: number | null;
   automationEnabled: boolean;
   analyticsEnabled: boolean;
+  aiEnabled: boolean;
+  maxAiCallsPerMonth: number;
 }
 
 interface UsageData {
@@ -56,6 +60,7 @@ const PLAN_CARDS = [
       '500 inbound messages / month',
       '100 outbound messages / day',
       '50 products',
+      '50 AI calls / month',
       'Basic inbox & cases',
     ],
     cta: null, // current or no upgrade needed
@@ -72,6 +77,7 @@ const PLAN_CARDS = [
       '5,000 inbound messages / month',
       '1,000 outbound messages / day',
       '500 products',
+      '1,000 AI calls / month',
       'Automation & analytics',
       'Priority support',
     ],
@@ -88,6 +94,7 @@ const PLAN_CARDS = [
       '50,000 inbound messages / month',
       '10,000 outbound messages / day',
       'Unlimited products',
+      '10,000 AI calls / month',
       'Automation & analytics',
       'Dedicated support',
     ],
@@ -118,12 +125,12 @@ export default function BillingPage() {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const headers = { Authorization: `Bearer ${token}` };
 
       const [subRes, usageRes] = await Promise.all([
-        fetch('/api/billing/subscription', { headers }),
-        fetch('/api/billing/usage', { headers }),
+        fetch(`${API_BASE}/billing/subscription`, { headers }),
+        fetch(`${API_BASE}/billing/usage`, { headers }),
       ]);
 
       if (!subRes.ok || !usageRes.ok) throw new Error('Failed to load billing data');
@@ -154,8 +161,8 @@ export default function BillingPage() {
   const handleUpgrade = async (plan: 'pro' | 'business') => {
     setUpgrading(plan);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/billing/create-checkout-session', {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${API_BASE}/billing/create-checkout-session`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -181,8 +188,8 @@ export default function BillingPage() {
   const handleManageSubscription = async () => {
     setPortalLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/billing/create-portal-session', {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${API_BASE}/billing/create-portal-session`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -296,7 +303,7 @@ export default function BillingPage() {
           <UsageBar
             label="AI Calls"
             used={current.aiCallsCount}
-            limit={Math.max(current.aiCallsCount + 1, 200)}
+            limit={limits.maxAiCallsPerMonth || 50}
             unit="calls"
           />
         </div>

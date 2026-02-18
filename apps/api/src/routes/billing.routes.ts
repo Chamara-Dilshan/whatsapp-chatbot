@@ -83,7 +83,7 @@ router.get('/billing/subscription', requireAuth, async (req: Request, res: Respo
 
   res.json({
     subscription: subscription ?? {
-      plan: 'free',
+      plan: limits.plan,
       status: 'active',
       currentPeriodStart: null,
       currentPeriodEnd: null,

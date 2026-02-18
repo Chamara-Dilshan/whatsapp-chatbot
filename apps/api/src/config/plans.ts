@@ -18,6 +18,8 @@ export interface PlanLimits {
   maxProducts: number | null; // null = unlimited
   automationEnabled: boolean;
   analyticsEnabled: boolean;
+  aiEnabled: boolean;
+  maxAiCallsPerMonth: number;
 }
 
 export const PLAN_LIMITS: Record<PlanName, PlanLimits> = {
@@ -28,6 +30,8 @@ export const PLAN_LIMITS: Record<PlanName, PlanLimits> = {
     maxProducts: 50,
     automationEnabled: false,
     analyticsEnabled: false,
+    aiEnabled: true,
+    maxAiCallsPerMonth: 50,
   },
   pro: {
     maxAgents: 3,
@@ -36,6 +40,8 @@ export const PLAN_LIMITS: Record<PlanName, PlanLimits> = {
     maxProducts: 500,
     automationEnabled: true,
     analyticsEnabled: true,
+    aiEnabled: true,
+    maxAiCallsPerMonth: 1000,
   },
   business: {
     maxAgents: 10,
@@ -44,6 +50,8 @@ export const PLAN_LIMITS: Record<PlanName, PlanLimits> = {
     maxProducts: null,
     automationEnabled: true,
     analyticsEnabled: true,
+    aiEnabled: true,
+    maxAiCallsPerMonth: 10000,
   },
 };
 

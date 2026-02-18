@@ -56,10 +56,16 @@ class ApiClient {
     });
 
     if (!response.ok) {
-      const error: ApiError = await response.json().catch(() => ({
+      const body = await response.json().catch(() => ({
         error: `HTTP ${response.status}`,
       }));
-      throw new Error(error.error || error.message || `Request failed: ${response.status}`);
+      // API returns { success: false, error: { code, message } } or { error: "string" }
+      const errObj = body.error;
+      const message =
+        typeof errObj === 'string'
+          ? errObj
+          : errObj?.message || body.message || `Request failed: ${response.status}`;
+      throw new Error(message);
     }
 
     const json = await response.json();
@@ -296,6 +302,25 @@ class ApiClient {
   async deleteTemplate(id: string) {
     return this.request<any>(`/tenant/templates/${id}`, {
       method: 'DELETE',
+    });
+  }
+
+  // Team
+  async getTeamMembers() {
+    return this.request<any>('/team');
+  }
+
+  async createTeamMember(data: { email: string; password: string; name: string; role: string }) {
+    return this.request<any>('/team', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateTeamMember(userId: string, data: { name?: string; role?: string; isActive?: boolean }) {
+    return this.request<any>(`/team/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     });
   }
 }

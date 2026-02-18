@@ -1,4 +1,5 @@
 import { INTENTS, CONVERSATION_STATUS } from '@whatsapp-bot/shared';
+import { prisma } from '../../lib/prisma';
 import { parseWebhookPayload } from './parser';
 import * as tenantRouting from '../tenant/tenantRouting.service';
 import * as customerService from '../customer/customer.service';
@@ -167,8 +168,20 @@ async function processInboundMessage(
     return;
   }
 
+  // Load recent messages for AI context
+  const recentMessages = await prisma.message.findMany({
+    where: { conversationId: conversation.id },
+    orderBy: { createdAt: 'desc' },
+    take: 5,
+    select: { body: true, direction: true },
+  });
+  const conversationHistory = recentMessages
+    .filter((m) => m.body && m.direction === 'inbound')
+    .map((m) => m.body!)
+    .reverse();
+
   // Step 11: Intent detection
-  let intentResult = await intentEngine.detectIntent(messageText, { tenantId });
+  let intentResult = await intentEngine.detectIntent(messageText, { tenantId, conversationHistory });
 
   // Handle interactive list replies (Phase 3 product selection)
   if (msg.interactiveReply?.type === 'list_reply') {
@@ -194,6 +207,7 @@ async function processInboundMessage(
     confidence: intentResult.confidence,
     messageText,
     extractedQuery: intentResult.extractedQuery,
+    conversationHistory,
   });
 
   // Step 13: Outbound message is persisted inside responseEngine

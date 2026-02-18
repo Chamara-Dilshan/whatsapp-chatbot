@@ -4,6 +4,11 @@ import { logger } from './lib/logger';
 import { prisma } from './lib/prisma';
 import { dispatcher } from './services/automation/dispatcher';
 import { startWebhookWorker, stopWebhookWorker } from './services/queue/webhook.worker';
+import { setAIProvider } from './services/intent/intentEngine';
+import { createAIProvider } from './services/intent/providers';
+
+// Initialize AI provider before starting the server
+setAIProvider(createAIProvider());
 
 const app = createApp();
 

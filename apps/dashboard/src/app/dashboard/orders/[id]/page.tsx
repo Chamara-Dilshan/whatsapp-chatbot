@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Badge from '../../../../components/Badge';
 import LoadingSpinner from '../../../../components/LoadingSpinner';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 // ── Types ─────────────────────────────────────────────────────────────────
 
 interface OrderItem {
@@ -70,8 +72,8 @@ export default function OrderDetailPage() {
   const fetchOrder = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/orders/${orderId}`, {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${API_BASE}/orders/${orderId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Order not found');
@@ -98,8 +100,8 @@ export default function OrderDetailPage() {
   const handleAction = async (action: string, body?: object) => {
     setActionLoading(action);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/orders/${orderId}/${action}`, {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${API_BASE}/orders/${orderId}/${action}`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

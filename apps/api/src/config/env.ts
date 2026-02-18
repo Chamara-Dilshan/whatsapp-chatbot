@@ -28,6 +28,12 @@ const envSchema = z.object({
   STRIPE_PRICE_ID_BUSINESS: z.string().optional(),
   // Dashboard URL for Stripe redirects
   DASHBOARD_URL: z.string().default('http://localhost:3001'),
+  // AI Provider
+  AI_PROVIDER: z.enum(['anthropic', 'openai', 'none']).default('none'),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  AI_MODEL: z.string().optional(), // defaults handled per provider
+  AI_TIMEOUT_MS: z.coerce.number().default(5000),
 });
 
 const parsed = envSchema.safeParse(process.env);

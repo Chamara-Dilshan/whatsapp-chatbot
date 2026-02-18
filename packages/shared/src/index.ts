@@ -8,6 +8,7 @@ export * from './schemas/template.schema';
 export * from './schemas/conversation.schema';
 export * from './schemas/case.schema';
 export * from './schemas/automation.schema';
+export * from './schemas/team.schema';
 
 // Types
 export * from './types/index';

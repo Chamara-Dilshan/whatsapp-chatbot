@@ -69,6 +69,23 @@ export const queueDepth = new Gauge({
 export const quotaExceeded = new Counter({
   name: 'quota_exceeded_total',
   help: 'Number of times a tenant quota was exceeded',
-  labelNames: ['tenant_id', 'quota_type'], // quota_type: inbound|outbound|agents
+  labelNames: ['tenant_id', 'quota_type'], // quota_type: inbound|outbound|agents|ai
+  registers: [register],
+});
+
+// ── AI Provider ──────────────────────────────────────────────────
+
+export const aiRequestsTotal = new Counter({
+  name: 'ai_requests_total',
+  help: 'Total AI provider requests',
+  labelNames: ['provider', 'type', 'status'], // provider: anthropic|openai, type: intent|response, status: success|error
+  registers: [register],
+});
+
+export const aiRequestDuration = new Histogram({
+  name: 'ai_request_duration_seconds',
+  help: 'Time taken for AI provider requests',
+  labelNames: ['provider', 'type'], // provider: anthropic|openai, type: intent|response
+  buckets: [0.1, 0.25, 0.5, 1, 2, 5, 10],
   registers: [register],
 });

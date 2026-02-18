@@ -11,6 +11,7 @@ import analyticsRoutes from './analytics.routes';
 import metricsRoutes from './metrics.routes';
 import billingRoutes from './billing.routes';
 import orderRoutes from './order.routes';
+import teamRoutes from './team.routes';
 
 const router = Router();
 
@@ -26,9 +27,10 @@ router.use(caseRoutes);
 router.use(automationRoutes);
 router.use(analyticsRoutes);
 
-// Phase 5: metrics, billing, orders
+// Phase 5: metrics, billing, orders, team
 router.use(metricsRoutes);
 router.use(billingRoutes);
 router.use(orderRoutes);
+router.use(teamRoutes);
 
 export default router;

@@ -60,6 +60,8 @@ export async function getEffectiveLimits(tenantId: string) {
     maxProducts: override?.maxProducts ?? base.maxProducts,
     automationEnabled: base.automationEnabled,
     analyticsEnabled: base.analyticsEnabled,
+    aiEnabled: base.aiEnabled,
+    maxAiCallsPerMonth: override?.maxAiCallsPerMonth ?? base.maxAiCallsPerMonth,
   };
 }
 
@@ -120,4 +122,27 @@ export async function checkAutomationEnabled(tenantId: string): Promise<boolean>
 export async function checkAnalyticsEnabled(tenantId: string): Promise<boolean> {
   const limits = await getEffectiveLimits(tenantId);
   return limits.analyticsEnabled;
+}
+
+/**
+ * Checks whether the tenant can make another AI call this month.
+ */
+export async function checkAiQuota(
+  tenantId: string
+): Promise<{ allowed: boolean; used: number; limit: number; remaining: number }> {
+  const [limits, usage] = await Promise.all([
+    getEffectiveLimits(tenantId),
+    getMonthlyUsage(tenantId),
+  ]);
+
+  const used = usage?.aiCallsCount ?? 0;
+  const limit = limits.maxAiCallsPerMonth;
+  const remaining = Math.max(0, limit - used);
+
+  return {
+    allowed: used < limit,
+    used,
+    limit,
+    remaining,
+  };
 }

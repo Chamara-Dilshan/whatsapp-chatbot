@@ -9,6 +9,9 @@ import { matchAgentRequest } from './rules/agentRequestRule';
 import { matchComplaint } from './rules/complaintRule';
 import { matchOptOut } from './rules/optOutRule';
 import { matchProductInquiry } from './rules/productInquiryRule';
+import { checkAiQuota } from '../billing/quota.service';
+import { incrementUsage } from '../billing/usage.service';
+import { prisma } from '../../lib/prisma';
 import { logger } from '../../lib/logger';
 
 // Rule matchers in priority order
@@ -36,7 +39,10 @@ export function setAIProvider(provider: AIIntentProvider): void {
  * Detect intent from message text.
  * Pipeline: rules-first, AI fallback for low confidence.
  */
-export async function detectIntent(text: string, context?: { tenantId?: string }): Promise<IntentResult> {
+export async function detectIntent(
+  text: string,
+  context?: { tenantId?: string; conversationHistory?: string[] }
+): Promise<IntentResult> {
   if (!text || text.trim().length === 0) {
     return { intent: INTENTS.OTHER, confidence: 0 };
   }
@@ -51,9 +57,37 @@ export async function detectIntent(text: string, context?: { tenantId?: string }
   }
 
   // 2. AI fallback for unmatched or low-confidence
+  if (context?.tenantId) {
+    // Check tenant AI toggle
+    const policies = await prisma.tenantPolicies.findUnique({
+      where: { tenantId: context.tenantId },
+      select: { aiEnabled: true },
+    });
+
+    if (!policies?.aiEnabled) {
+      logger.debug({ tenantId: context.tenantId }, 'AI disabled for tenant, skipping AI fallback');
+      return { intent: INTENTS.OTHER, confidence: 0.1 };
+    }
+
+    // Check AI quota
+    const quota = await checkAiQuota(context.tenantId);
+    if (!quota.allowed) {
+      logger.debug(
+        { tenantId: context.tenantId, used: quota.used, limit: quota.limit },
+        'AI quota exhausted, skipping AI fallback'
+      );
+      return { intent: INTENTS.OTHER, confidence: 0.1 };
+    }
+  }
+
   try {
     const aiResult = await aiProvider.detectIntent(text, context);
     logger.debug({ intent: aiResult.intent, confidence: aiResult.confidence }, 'Intent from AI provider');
+
+    // Track AI usage
+    if (context?.tenantId) {
+      await incrementUsage(context.tenantId, 'aiCallsCount');
+    }
 
     if (aiResult.confidence >= CONFIDENCE_THRESHOLD) {
       return aiResult;

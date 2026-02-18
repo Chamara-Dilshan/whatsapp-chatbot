@@ -6,6 +6,8 @@ import Badge from '../../../components/Badge';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 // ── Types ─────────────────────────────────────────────────────────────────
 
 interface OrderItem {
@@ -58,14 +60,14 @@ export default function OrdersPage() {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const params = new URLSearchParams();
       if (statusFilter) params.set('status', statusFilter);
       if (search) params.set('q', search);
       params.set('limit', String(LIMIT));
       params.set('offset', String(page * LIMIT));
 
-      const res = await fetch(`/api/orders?${params}`, {
+      const res = await fetch(`${API_BASE}/orders?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to load orders');
@@ -86,8 +88,8 @@ export default function OrdersPage() {
   const handleAction = async (orderId: string, action: string) => {
     setActionLoading(orderId + action);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/orders/${orderId}/${action}`, {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${API_BASE}/orders/${orderId}/${action}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
