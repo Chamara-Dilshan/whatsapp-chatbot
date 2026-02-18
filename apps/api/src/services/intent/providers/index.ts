@@ -24,6 +24,15 @@ export function createAIProvider(): AIIntentProvider {
       logger.info('AI intent provider initialized: OpenAI');
       return new OpenAIIntentProvider();
     }
+    case 'gemini': {
+      if (!env.GEMINI_API_KEY) {
+        logger.warn('AI_PROVIDER=gemini but GEMINI_API_KEY missing, using stub');
+        return new StubAIProvider();
+      }
+      const { GeminiIntentProvider } = require('./geminiProvider');
+      logger.info('AI intent provider initialized: Gemini');
+      return new GeminiIntentProvider();
+    }
     default:
       logger.info('AI intent provider: stub (disabled)');
       return new StubAIProvider();

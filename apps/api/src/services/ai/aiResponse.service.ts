@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { env } from '../../config/env';
 import { checkAiQuota } from '../billing/quota.service';
 import { incrementUsage } from '../billing/usage.service';
@@ -83,6 +84,8 @@ Do NOT use markdown formatting. Use plain text only.`;
       responseText = await generateWithAnthropic(systemPrompt, messageText, conversationHistory);
     } else if (provider === 'openai' && env.OPENAI_API_KEY) {
       responseText = await generateWithOpenAI(systemPrompt, messageText, conversationHistory);
+    } else if (provider === 'gemini' && env.GEMINI_API_KEY) {
+      responseText = await generateWithGemini(systemPrompt, messageText, conversationHistory);
     }
 
     if (!responseText) {
@@ -190,6 +193,48 @@ async function generateWithOpenAI(
       provider: 'openai',
       promptTokens: response.usage?.prompt_tokens,
       completionTokens: response.usage?.completion_tokens,
+    },
+    'AI response generation completed'
+  );
+
+  return content;
+}
+
+async function generateWithGemini(
+  systemPrompt: string,
+  messageText: string,
+  conversationHistory?: string[]
+): Promise<string | null> {
+  const client = new GoogleGenerativeAI(env.GEMINI_API_KEY!);
+  const model = client.getGenerativeModel({
+    model: env.AI_MODEL || 'gemini-2.0-flash',
+    systemInstruction: systemPrompt,
+  });
+
+  const history: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+  if (conversationHistory?.length) {
+    for (const msg of conversationHistory.slice(-5)) {
+      history.push({ role: 'user', parts: [{ text: msg }] });
+      history.push({ role: 'model', parts: [{ text: 'Understood.' }] });
+    }
+  }
+
+  const chat = model.startChat({ history });
+
+  const response = await withExponentialBackoff(
+    () => chat.sendMessage(messageText),
+    { maxAttempts: 2, baseDelayMs: 300 }
+  );
+
+  const content = response.response.text();
+  if (!content) return null;
+
+  const usageMetadata = response.response.usageMetadata;
+  logger.info(
+    {
+      provider: 'gemini',
+      promptTokens: usageMetadata?.promptTokenCount,
+      completionTokens: usageMetadata?.candidatesTokenCount,
     },
     'AI response generation completed'
   );
