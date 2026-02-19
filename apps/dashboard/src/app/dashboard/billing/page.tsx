@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import UsageBar from '../../../components/UsageBar';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import Badge from '../../../components/Badge';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -114,12 +115,15 @@ const statusVariant: Record<string, 'green' | 'yellow' | 'red' | 'gray'> = {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function BillingPage() {
+  const { user } = useAuth();
+  const isOwner = user?.role === 'owner';
   const [subData, setSubData] = useState<SubscriptionData | null>(null);
   const [usageData, setUsageData] = useState<UsageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -160,6 +164,7 @@ export default function BillingPage() {
 
   const handleUpgrade = async (plan: 'pro' | 'business') => {
     setUpgrading(plan);
+    setActionError(null);
     try {
       const token = localStorage.getItem('auth_token');
       const res = await fetch(`${API_BASE}/billing/create-checkout-session`, {
@@ -173,13 +178,18 @@ export default function BillingPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error ?? 'Failed to create checkout session');
+        const errObj = data.error;
+        const message =
+          typeof errObj === 'string'
+            ? errObj
+            : errObj?.message || 'Failed to create checkout session';
+        throw new Error(message);
       }
 
       const { url } = await res.json();
       window.location.href = url;
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Upgrade failed');
+      setActionError(err instanceof Error ? err.message : 'Upgrade failed');
     } finally {
       setUpgrading(null);
     }
@@ -187,6 +197,7 @@ export default function BillingPage() {
 
   const handleManageSubscription = async () => {
     setPortalLoading(true);
+    setActionError(null);
     try {
       const token = localStorage.getItem('auth_token');
       const res = await fetch(`${API_BASE}/billing/create-portal-session`, {
@@ -196,13 +207,18 @@ export default function BillingPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error ?? 'Failed to open portal');
+        const errObj = data.error;
+        const message =
+          typeof errObj === 'string'
+            ? errObj
+            : errObj?.message || 'Failed to open billing portal';
+        throw new Error(message);
       }
 
       const { url } = await res.json();
       window.location.href = url;
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Could not open billing portal');
+      setActionError(err instanceof Error ? err.message : 'Could not open billing portal');
     } finally {
       setPortalLoading(false);
     }
@@ -241,6 +257,36 @@ export default function BillingPage() {
         </p>
       </div>
 
+      {/* Non-owner info banner */}
+      {!isOwner && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <svg className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-amber-800">View-only access</p>
+              <p className="mt-0.5 text-sm text-amber-700">
+                Only the account owner can manage billing and upgrade plans. Contact your account owner to make changes.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Action error banner */}
+      {actionError && (
+        <div className="mb-4 flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800">
+          <span>{actionError}</span>
+          <button
+            onClick={() => setActionError(null)}
+            className="ml-4 text-red-600 hover:text-red-800"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Current subscription summary */}
       <div className="mb-8 rounded-xl border bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -264,8 +310,8 @@ export default function BillingPage() {
             )}
           </div>
 
-          {/* Portal button — only for paid plans */}
-          {currentPlan !== 'free' && isActive && (
+          {/* Portal button — only for owners on paid plans */}
+          {isOwner && currentPlan !== 'free' && isActive && (
             <button
               onClick={handleManageSubscription}
               disabled={portalLoading}
@@ -378,7 +424,7 @@ export default function BillingPage() {
                   <div className="rounded-lg bg-gray-100 py-2 text-center text-sm font-medium text-gray-500">
                     Current Plan
                   </div>
-                ) : plan.cta ? (
+                ) : plan.cta && isOwner ? (
                   <button
                     onClick={() => handleUpgrade(plan.key as 'pro' | 'business')}
                     disabled={!!upgrading}

@@ -40,7 +40,7 @@ A production-ready, multi-tenant WhatsApp Business API support bot with AI-power
 - Per-tenant monthly usage counters with atomic Prisma upsert+increment
 - Quota enforcement: inbound limits, agent limits, feature gates (automation, analytics)
 - Tenant quota overrides for custom enterprise plans
-- Dashboard billing page with plan cards, usage bars, and Stripe redirect
+- Dashboard billing page with plan cards, usage bars, Stripe redirect, and role-based access (owner-only upgrade, non-owner view-only banner)
 
 ### 📊 Analytics & Reporting
 - Overview metrics (conversations, cases, response times, SLA breaches)
@@ -99,7 +99,8 @@ cd apps/dashboard && pnpm dev
 ```
 
 **Access the dashboard:** http://localhost:3001
-**Login:** `owner@acme.test` / `password123`
+**Register a new account:** http://localhost:3001/register
+**Login (demo):** `owner@acme.test` / `password123`
 
 > **Note:** Docker starts both PostgreSQL (port 5433) and Redis (port 6379). Redis is required for the webhook processing queue.
 
@@ -137,7 +138,8 @@ whatsapp-chatbot/
 │   └── dashboard/              # Next.js frontend (port 3001)
 │       ├── src/
 │       │   ├── app/
-│       │   │   ├── login/
+│       │   │   ├── login/      # Login page with sign-up link
+│       │   │   ├── register/   # Owner registration page
 │       │   │   └── dashboard/
 │       │   │       ├── inbox/     # Conversation management
 │       │   │       ├── cases/     # Case tracking & SLA
@@ -156,6 +158,8 @@ whatsapp-chatbot/
 │       │   │   └── UsageBar.tsx       # Billing usage progress bars
 │       │   ├── hooks/
 │       │   │   └── useDebounce.ts     # Search debouncing (300ms)
+│       │   ├── contexts/
+│       │   │   └── AuthContext.tsx     # Auth context (login, register, logout)
 │       │   └── lib/
 │       │       └── api.ts             # Typed API client
 │

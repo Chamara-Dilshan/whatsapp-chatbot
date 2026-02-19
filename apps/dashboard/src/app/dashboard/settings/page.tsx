@@ -170,14 +170,17 @@ export default function SettingsPage() {
         timezone: data.timezone || 'UTC',
         autoReplyDelay: data.autoReplyDelay?.toString() || '0',
         businessHours: data.businessHours ? {
-          mon: { enabled: !!data.businessHours.mon, ...data.businessHours.mon },
-          tue: { enabled: !!data.businessHours.tue, ...data.businessHours.tue },
-          wed: { enabled: !!data.businessHours.wed, ...data.businessHours.wed },
-          thu: { enabled: !!data.businessHours.thu, ...data.businessHours.thu },
-          fri: { enabled: !!data.businessHours.fri, ...data.businessHours.fri },
-          sat: { enabled: !!data.businessHours.sat, ...data.businessHours.sat },
-          sun: { enabled: !!data.businessHours.sun, ...data.businessHours.sun },
-        } : policiesData.businessHours,
+          ...Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => {
+            const d = data.businessHours[day];
+            const isValidTime = (v: string) => /^\d{2}:\d{2}/.test(v);
+            const enabled = d ? (d.enabled !== undefined ? !!d.enabled : isValidTime(d.open)) : false;
+            return [day, {
+              enabled,
+              open: (d && isValidTime(d.open)) ? d.open : '09:00',
+              close: (d && isValidTime(d.close)) ? d.close : '17:00',
+            }];
+          })),
+        } as typeof policiesData.businessHours : policiesData.businessHours,
       });
 
       // Also populate language/tone tab
@@ -416,7 +419,7 @@ export default function SettingsPage() {
                         value={waFormData.catalogId}
                         onChange={(e) => setWaFormData({ ...waFormData, catalogId: e.target.value })}
                         placeholder={waStatus[0].catalogId || 'Enter catalog ID'}
-                        className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                        className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
                       />
                       <button
                         onClick={handleUpdateCatalog}
@@ -1079,7 +1082,7 @@ export default function SettingsPage() {
               value={templateFormData.intent}
               onChange={(e) => setTemplateFormData({ ...templateFormData, intent: e.target.value })}
               placeholder="e.g., greeting, refund_cancel, order_tracking"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
             />
           </div>
 
@@ -1093,7 +1096,7 @@ export default function SettingsPage() {
               maxLength={100}
               value={templateFormData.name}
               onChange={(e) => setTemplateFormData({ ...templateFormData, name: e.target.value })}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
             />
           </div>
 
@@ -1107,7 +1110,7 @@ export default function SettingsPage() {
               value={templateFormData.body}
               onChange={(e) => setTemplateFormData({ ...templateFormData, body: e.target.value })}
               placeholder="Template text. You can use placeholders like {{customerName}}"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
             />
           </div>
 

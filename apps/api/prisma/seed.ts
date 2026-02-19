@@ -87,7 +87,7 @@ async function main() {
         thu: { open: '09:00', close: '17:00' },
         fri: { open: '09:00', close: '17:00' },
         sat: { open: '10:00', close: '14:00' },
-        sun: { open: 'closed', close: 'closed' },
+        sun: { enabled: false, open: '09:00', close: '17:00' },
       },
       timezone: 'America/New_York',
     },
