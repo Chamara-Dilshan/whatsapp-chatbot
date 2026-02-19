@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { registerSchema, loginSchema } from '../schemas/auth.schema';
+import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from '../schemas/auth.schema';
 import { connectWhatsAppSchema, updateCatalogSchema } from '../schemas/tenant.schema';
 import { createProductSchema, updateProductSchema, productQuerySchema, csvImportResultSchema } from '../schemas/product.schema';
 import { updatePoliciesSchema } from '../schemas/policy.schema';
@@ -11,6 +11,8 @@ import { paginationSchema } from '../schemas/common.schema';
 // Auth
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 // Tenant
 export type ConnectWhatsAppInput = z.infer<typeof connectWhatsAppSchema>;

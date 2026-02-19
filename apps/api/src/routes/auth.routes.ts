@@ -1,8 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { registerSchema, loginSchema } from '@whatsapp-bot/shared';
+import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from '@whatsapp-bot/shared';
 import * as authService from '../services/auth/auth.service';
 import { requireAuth } from '../middleware/requireAuth';
-import { authLimiter } from '../middleware/rateLimiter';
+import { authLimiter, forgotPasswordLimiter } from '../middleware/rateLimiter';
 import { signToken, signRefreshToken, verifyRefreshToken } from '../lib/jwt.util';
 import { UnauthorizedError } from '../middleware/errorHandler';
 
@@ -55,6 +55,35 @@ router.get('/auth/me', requireAuth, async (req: Request, res: Response, next: Ne
   try {
     const result = await authService.getMe(req.auth!.userId, req.auth!.tenantId);
     res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /auth/forgot-password — request a password reset link (no auth required)
+router.post('/auth/forgot-password', forgotPasswordLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const input = forgotPasswordSchema.parse(req.body);
+    await authService.requestPasswordReset(input);
+    // Always return 200 with a generic message — no email enumeration
+    res.json({
+      success: true,
+      data: { message: "If that email exists, you'll receive a reset link shortly." },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /auth/reset-password — apply new password using reset token (no auth required)
+router.post('/auth/reset-password', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const input = resetPasswordSchema.parse(req.body);
+    await authService.resetPassword(input);
+    res.json({
+      success: true,
+      data: { message: 'Password reset successfully. You can now sign in.' },
+    });
   } catch (err) {
     next(err);
   }

@@ -47,8 +47,26 @@ model TenantUser {
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
+  passwordResetTokens PasswordResetToken[]
+
   @@unique([tenantId, email])
   @@index([tenantId])
+}
+
+// ─── Password Reset ───────────────────────────────────────────────────
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user TenantUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
 }
 
 model TenantWhatsApp {

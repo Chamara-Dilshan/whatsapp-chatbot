@@ -26,6 +26,30 @@ export const authLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter for password reset requests.
+ * 3 requests per 15 minutes per IP — prevents abuse of email sending.
+ */
+export const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) =>
+    (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ||
+    req.socket.remoteAddress ||
+    'unknown',
+  handler: (_req: Request, res: Response) => {
+    res.status(429).json({
+      success: false,
+      error: {
+        code: 'RATE_LIMITED',
+        message: 'Too many password reset requests. Please try again in 15 minutes.',
+      },
+    });
+  },
+});
+
+/**
  * General API rate limiter.
  * 100 requests per minute per tenant (or IP for unauthenticated requests).
  */
