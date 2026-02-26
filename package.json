@@ -15,9 +15,14 @@
     "prisma:seed": "pnpm --filter @whatsapp-bot/api prisma:seed",
     "prisma:studio": "pnpm --filter @whatsapp-bot/api prisma:studio",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint"
+    "lint": "pnpm -r lint",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "typescript": "^5.5.0"
   },
   "engines": {

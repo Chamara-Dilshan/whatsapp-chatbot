@@ -27,3 +27,9 @@ pgdata/
 PLAN.md
 CLAUDE.md
 docs
+.playwright-mcp
+
+# Playwright E2E
+playwright-report/
+test-results/
+e2e/.auth-tokens.json
