@@ -27,10 +27,12 @@ async function main() {
   console.log(`  Created tenant: ${tenant.name} (${tenant.id})`);
 
   // 2. Create owner user
+  // ID is hardcoded to match the token in e2e/global-setup.ts
   const owner = await prisma.tenantUser.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: 'owner@acme.test' } },
     update: {},
     create: {
+      id: 'cmlqs2ktr0001bvh9yssjlemf',
       tenantId: tenant.id,
       email: 'owner@acme.test',
       passwordHash: hashSync('password123', 12),
@@ -41,10 +43,12 @@ async function main() {
   console.log(`  Created owner: ${owner.email}`);
 
   // 3. Create agent user
+  // ID is hardcoded to match the token in e2e/global-setup.ts
   const agent = await prisma.tenantUser.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: 'agent@acme.test' } },
     update: {},
     create: {
+      id: 'cmlqs2l3l0003bvh98nkfa2rs',
       tenantId: tenant.id,
       email: 'agent@acme.test',
       passwordHash: hashSync('password123', 12),
