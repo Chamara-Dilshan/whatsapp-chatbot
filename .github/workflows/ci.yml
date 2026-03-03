@@ -160,44 +160,8 @@ jobs:
       - name: Run database migrations
         run: pnpm --filter @whatsapp-bot/api exec prisma migrate deploy
 
-      - name: Verify database connectivity and tools
-        run: |
-          echo "DATABASE_URL: $DATABASE_URL"
-          echo "tsx version: $(pnpm --filter @whatsapp-bot/api exec tsx --version)"
-          pnpm --filter @whatsapp-bot/api exec node -e "
-            const { PrismaClient } = require('@prisma/client');
-            const p = new PrismaClient();
-            p.\$connect().then(() => { console.log('DB connected OK'); return p.\$disconnect(); })
-              .catch(e => { console.error('DB connect failed:', e.message); process.exit(1); });
-          "
-
       - name: Seed database
-        run: pnpm --filter @whatsapp-bot/api exec prisma db seed
-        continue-on-error: true
-        id: seed
-
-      - name: Debug seed failure
-        if: steps.seed.outcome == 'failure'
-        run: |
-          echo "=== Seed failed — running tsx directly ==="
-          cd apps/api
-          node_modules/.bin/tsx prisma/seed.ts 2>&1 | tee /tmp/seed-error.log || true
-          echo "=== Exit code above ==="
-          cat /tmp/seed-error.log
-        env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-
-      - name: Upload seed error log
-        if: steps.seed.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: seed-error-log
-          path: /tmp/seed-error.log
-          retention-days: 3
-
-      - name: Fail if seed failed
-        if: steps.seed.outcome == 'failure'
-        run: exit 1
+        run: pnpm prisma:seed
 
       - name: Build all packages
         run: pnpm build

@@ -184,7 +184,12 @@ async function main() {
   for (const template of templates) {
     await prisma.replyTemplate.upsert({
       where: {
-        tenantId_intent: { tenantId: tenant.id, intent: template.intent },
+        tenantId_intent_language_tone: {
+          tenantId: tenant.id,
+          intent: template.intent,
+          language: 'EN',
+          tone: 'FRIENDLY',
+        },
       },
       update: {},
       create: {
