@@ -48,6 +48,7 @@ test.describe('Sidebar', () => {
 
 test.describe('No server errors', () => {
   test('no 5xx responses on any dashboard page', async ({ ownerPage: page }) => {
+    test.setTimeout(120000); // 8 pages × networkidle can exceed the 30s default
     for (const { path } of PAGES) {
       const failed: string[] = [];
       const listener = (res: { status: () => number; url: () => string }) => {

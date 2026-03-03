@@ -239,6 +239,43 @@ async function setupAuthenticatedPage(
     }
   });
 
+  // ── Inbox (seed has no conversations; mock prevents slow real API calls
+  //    in navigation tests and the no-5xx-responses test)
+  await page.route(
+    (url) => url.port === '4000' && url.pathname === '/inbox',
+    async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200, contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: { conversations: [], total: 0 } }),
+        });
+      } else { await route.continue(); }
+    }
+  );
+
+  await page.route(
+    (url) => url.port === '4000' && url.pathname === '/inbox/stats',
+    async (route) => {
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { needsAgent: 0, inProgress: 0, unassigned: 0, myAssigned: 0 } }),
+      });
+    }
+  );
+
+  // ── Cases (seed has no cases)
+  await page.route(
+    (url) => url.port === '4000' && url.pathname === '/cases',
+    async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200, contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: { cases: [], total: 0 } }),
+        });
+      } else { await route.continue(); }
+    }
+  );
+
   // ── Inject auth token into localStorage on EVERY page navigation.
   // Runs before any page script so AuthContext has the token on first mount.
   await page.addInitScript((t) => {

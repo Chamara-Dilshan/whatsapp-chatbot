@@ -196,14 +196,22 @@ jobs:
 
           echo ""
           echo "Waiting for Dashboard on :3001..."
+          DASHBOARD_UP=false
           for i in $(seq 1 30); do
-            if curl -sf --max-time 5 http://localhost:3001 > /dev/null 2>&1; then
+            if curl -sf --max-time 5 http://localhost:3001/login > /dev/null 2>&1; then
               echo "Dashboard is ready after $i attempts"
+              DASHBOARD_UP=true
               break
             fi
             echo "  attempt $i/30 — retrying in 2s"
             sleep 2
           done
+
+          if [ "$DASHBOARD_UP" = "false" ]; then
+            echo ""
+            echo "WARNING: Dashboard did not respond after 60s — showing dashboard log:"
+            cat dashboard.log || true
+          fi
 
       - name: Run Playwright tests
         run: pnpm test:e2e
