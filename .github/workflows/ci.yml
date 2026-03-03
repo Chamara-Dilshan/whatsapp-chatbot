@@ -177,7 +177,7 @@ jobs:
           echo "Waiting for API on :4000..."
           API_UP=false
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:4000/health > /dev/null 2>&1; then
+            if curl -sf --max-time 5 http://localhost:4000/health > /dev/null 2>&1; then
               echo "API is ready after $i attempts"
               API_UP=true
               break
@@ -197,7 +197,7 @@ jobs:
           echo ""
           echo "Waiting for Dashboard on :3001..."
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:3001 > /dev/null 2>&1; then
+            if curl -sf --max-time 5 http://localhost:3001 > /dev/null 2>&1; then
               echo "Dashboard is ready after $i attempts"
               break
             fi
