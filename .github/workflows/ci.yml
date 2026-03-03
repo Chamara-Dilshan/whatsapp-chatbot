@@ -1,0 +1,199 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # ── 1. Type checking ─────────────────────────────────────────────────────────
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check all workspaces
+        run: pnpm typecheck
+
+  # ── 2. Build ──────────────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: typecheck
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+
+  # ── 3. E2E (Playwright) ───────────────────────────────────────────────────────
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: [typecheck, build]
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: whatsapp_bot
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5433/whatsapp_bot
+      JWT_SECRET: ci-jwt-secret-at-least-32-characters-long
+      JWT_REFRESH_SECRET: ci-refresh-secret-at-least-32-chars-ok
+      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      WEBHOOK_VERIFY_TOKEN: ci-verify-token
+      REDIS_URL: redis://localhost:6379
+      PORT: "4000"
+      NODE_ENV: test
+      AI_PROVIDER: none
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Playwright browser cache keyed on lockfile so it only re-downloads
+      # when dependencies change.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers (first run)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install Playwright system deps (cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      # global-setup.ts reads JWT_SECRET directly from apps/api/.env
+      - name: Write apps/api/.env
+        run: |
+          cat > apps/api/.env << 'EOF'
+          DATABASE_URL=postgresql://postgres:postgres@localhost:5433/whatsapp_bot
+          JWT_SECRET=ci-jwt-secret-at-least-32-characters-long
+          JWT_REFRESH_SECRET=ci-refresh-secret-at-least-32-chars-ok
+          ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          WEBHOOK_VERIFY_TOKEN=ci-verify-token
+          REDIS_URL=redis://localhost:6379
+          PORT=4000
+          NODE_ENV=test
+          AI_PROVIDER=none
+          EOF
+
+      - name: Write apps/dashboard/.env.local
+        run: echo "NEXT_PUBLIC_API_URL=http://localhost:4000" > apps/dashboard/.env.local
+
+      - name: Generate Prisma client
+        run: pnpm prisma:generate
+
+      - name: Run database migrations
+        run: pnpm --filter @whatsapp-bot/api exec prisma migrate deploy
+
+      - name: Seed database
+        run: pnpm prisma:seed
+
+      - name: Build all packages
+        run: pnpm build
+
+      - name: Start API server
+        run: pnpm --filter @whatsapp-bot/api start &
+
+      - name: Start Dashboard
+        run: PORT=3001 pnpm --filter @whatsapp-bot/dashboard start &
+
+      - name: Wait for API and Dashboard to be ready
+        run: |
+          echo "Waiting for API on :4000..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4000/health > /dev/null; then
+              echo "API is ready"
+              break
+            fi
+            echo "  attempt $i/30 — retrying in 2s"
+            sleep 2
+          done
+
+          echo "Waiting for Dashboard on :3001..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3001 > /dev/null; then
+              echo "Dashboard is ready"
+              break
+            fi
+            echo "  attempt $i/30 — retrying in 2s"
+            sleep 2
+          done
+
+      - name: Run Playwright tests
+        run: pnpm test:e2e
+
+      # Always upload the report on failure so it can be downloaded and inspected
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
