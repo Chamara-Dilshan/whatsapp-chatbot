@@ -7,7 +7,7 @@ test.describe('Team page', () => {
   });
 
   test('shows Team heading with member count', async ({ ownerPage: page }) => {
-    await expect(page.getByText(/\d+ members?/)).toBeVisible();
+    await expect(page.getByText(/\d+ members?/).first()).toBeVisible();
   });
 
   test('shows team members in table', async ({ ownerPage: page }) => {

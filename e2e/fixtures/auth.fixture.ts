@@ -313,17 +313,30 @@ async function setupAuthenticatedPage(
           }),
         });
       } else if (method === 'POST') {
-        // Pass through to real API so the product is actually created;
-        // capture the created product so the next GET returns it.
-        const response = await route.fetch();
-        const text = await response.text();
-        try {
-          const json = JSON.parse(text);
-          if (json.success && json.data) {
-            mockProductStore.push(json.data);
-          }
-        } catch { /* ignore parse errors */ }
-        await route.fulfill({ response });
+        // Fully mock POST — route.fetch() fails in Linux CI because
+        // localhost resolves to ::1 (IPv6) but the API binds on 127.0.0.1.
+        // Build a fake created product from the request body and add it to
+        // the store so the next GET returns it (test: create and verify).
+        const postData = route.request().postData();
+        const body = postData ? JSON.parse(postData) : {};
+        const newProduct = {
+          id: `mock_${Date.now()}`,
+          retailerId: body.retailerId || '',
+          name: body.name || '',
+          description: body.description || '',
+          price: body.price || 0,
+          currency: body.currency || 'USD',
+          category: body.category || '',
+          keywords: body.keywords || [],
+          inStock: body.inStock !== false,
+          isActive: true,
+        };
+        mockProductStore.push(newProduct);
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: newProduct }),
+        });
       } else {
         await route.continue();
       }
