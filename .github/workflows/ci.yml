@@ -195,7 +195,7 @@ jobs:
           done
 
       - name: Run Playwright tests
-        run: pnpm test:e2e
+        run: pnpm test:e2e --reporter=list,html
 
       # Always upload the report on failure so it can be downloaded and inspected
       - name: Upload Playwright report
