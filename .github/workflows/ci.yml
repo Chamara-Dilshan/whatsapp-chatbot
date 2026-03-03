@@ -173,6 +173,23 @@ jobs:
 
       - name: Seed database
         run: pnpm --filter @whatsapp-bot/api exec prisma db seed
+        continue-on-error: true
+        id: seed
+
+      - name: Debug seed failure
+        if: steps.seed.outcome == 'failure'
+        run: |
+          echo "=== Seed failed, running directly for full error ==="
+          cd apps/api
+          node_modules/.bin/tsx prisma/seed.ts || true
+          echo "=== Prisma schema check ==="
+          node_modules/.bin/prisma validate || true
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+
+      - name: Fail if seed failed
+        if: steps.seed.outcome == 'failure'
+        run: exit 1
 
       - name: Build all packages
         run: pnpm build
