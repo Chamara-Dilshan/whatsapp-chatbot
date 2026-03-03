@@ -160,8 +160,19 @@ jobs:
       - name: Run database migrations
         run: pnpm --filter @whatsapp-bot/api exec prisma migrate deploy
 
+      - name: Verify database connectivity and tools
+        run: |
+          echo "DATABASE_URL: $DATABASE_URL"
+          echo "tsx version: $(pnpm --filter @whatsapp-bot/api exec tsx --version)"
+          pnpm --filter @whatsapp-bot/api exec node -e "
+            const { PrismaClient } = require('@prisma/client');
+            const p = new PrismaClient();
+            p.\$connect().then(() => { console.log('DB connected OK'); return p.\$disconnect(); })
+              .catch(e => { console.error('DB connect failed:', e.message); process.exit(1); });
+          "
+
       - name: Seed database
-        run: pnpm prisma:seed
+        run: pnpm --filter @whatsapp-bot/api exec prisma db seed
 
       - name: Build all packages
         run: pnpm build
