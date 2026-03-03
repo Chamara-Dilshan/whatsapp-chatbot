@@ -25,6 +25,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Prisma client must be generated before tsc runs; without it, all
+      # Prisma query result types are `any` and cause noImplicitAny failures.
+      - name: Generate Prisma client
+        run: pnpm prisma:generate
+
       - name: Type check all workspaces
         run: pnpm typecheck
 
@@ -47,6 +52,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm prisma:generate
 
       - name: Build all packages
         run: pnpm build
