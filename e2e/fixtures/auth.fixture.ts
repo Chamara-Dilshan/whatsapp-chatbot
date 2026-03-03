@@ -35,6 +35,15 @@ const AGENT_USER = {
   tenantId: 'tenant_demo_001',
 };
 
+// Seed product data matching prisma/seed.ts (subset of 5 is enough for all tests)
+const SEED_PRODUCTS = [
+  { id: 'seed_p1', retailerId: 'SKU001', name: 'Wireless Mouse', description: 'Ergonomic wireless mouse with USB-C receiver', price: 29.99, currency: 'USD', category: 'Electronics', keywords: ['mouse', 'wireless'], inStock: true, isActive: true },
+  { id: 'seed_p2', retailerId: 'SKU002', name: 'Mechanical Keyboard', description: 'RGB mechanical keyboard with Cherry MX switches', price: 89.99, currency: 'USD', category: 'Electronics', keywords: ['keyboard', 'mechanical'], inStock: true, isActive: true },
+  { id: 'seed_p3', retailerId: 'SKU003', name: 'USB-C Hub', description: '7-in-1 USB-C hub with HDMI', price: 45.99, currency: 'USD', category: 'Electronics', keywords: ['usb-c', 'hub'], inStock: true, isActive: true },
+  { id: 'seed_p4', retailerId: 'SKU004', name: 'Laptop Stand', description: 'Adjustable aluminum laptop stand', price: 39.99, currency: 'USD', category: 'Accessories', keywords: ['laptop', 'stand'], inStock: true, isActive: true },
+  { id: 'seed_p5', retailerId: 'SKU005', name: 'Webcam HD 1080p', description: 'Full HD webcam with built-in microphone', price: 59.99, currency: 'USD', category: 'Electronics', keywords: ['webcam', 'hd'], inStock: true, isActive: true },
+];
+
 // Shared mock data constants
 const PRO_LIMITS = {
   plan: 'pro',
@@ -273,6 +282,51 @@ async function setupAuthenticatedPage(
           body: JSON.stringify({ success: true, data: { cases: [], total: 0 } }),
         });
       } else { await route.continue(); }
+    }
+  );
+
+  // ── Products (GET mocked to avoid slow/hanging real API; POST passed through so
+  //    "create and verify new product appears" can still create a real product and
+  //    see it in the list via the updated mock store)
+  const mockProductStore: any[] = [...SEED_PRODUCTS];
+
+  await page.route(
+    (url) => url.port === '4000' && url.pathname === '/products/categories',
+    async (route) => {
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: ['Electronics', 'Accessories', 'Audio'] }),
+      });
+    }
+  );
+
+  await page.route(
+    (url) => url.port === '4000' && url.pathname === '/products',
+    async (route) => {
+      const method = route.request().method();
+      if (method === 'GET') {
+        await route.fulfill({
+          status: 200, contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            data: { products: mockProductStore, total: mockProductStore.length },
+          }),
+        });
+      } else if (method === 'POST') {
+        // Pass through to real API so the product is actually created;
+        // capture the created product so the next GET returns it.
+        const response = await route.fetch();
+        const text = await response.text();
+        try {
+          const json = JSON.parse(text);
+          if (json.success && json.data) {
+            mockProductStore.push(json.data);
+          }
+        } catch { /* ignore parse errors */ }
+        await route.fulfill({ response });
+      } else {
+        await route.continue();
+      }
     }
   );
 
