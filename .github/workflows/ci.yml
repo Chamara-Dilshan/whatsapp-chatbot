@@ -179,13 +179,21 @@ jobs:
       - name: Debug seed failure
         if: steps.seed.outcome == 'failure'
         run: |
-          echo "=== Seed failed, running directly for full error ==="
+          echo "=== Seed failed — running tsx directly ==="
           cd apps/api
-          node_modules/.bin/tsx prisma/seed.ts || true
-          echo "=== Prisma schema check ==="
-          node_modules/.bin/prisma validate || true
+          node_modules/.bin/tsx prisma/seed.ts 2>&1 | tee /tmp/seed-error.log || true
+          echo "=== Exit code above ==="
+          cat /tmp/seed-error.log
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
+
+      - name: Upload seed error log
+        if: steps.seed.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: seed-error-log
+          path: /tmp/seed-error.log
+          retention-days: 3
 
       - name: Fail if seed failed
         if: steps.seed.outcome == 'failure'
