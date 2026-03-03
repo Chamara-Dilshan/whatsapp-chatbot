@@ -194,6 +194,25 @@ jobs:
             sleep 2
           done
 
+      - name: Smoke test API endpoints
+        run: |
+          JWT=$(node -e "
+            const crypto=require('crypto');
+            const h=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
+            const p=Buffer.from(JSON.stringify({userId:'cmlqs2ktr0001bvh9yssjlemf',tenantId:'tenant_demo_001',role:'owner',iat:Math.floor(Date.now()/1000),exp:Math.floor(Date.now()/1000)+86400})).toString('base64url');
+            const sig=crypto.createHmac('sha256','ci-jwt-secret-at-least-32-characters-long').update(h+'.'+p).digest('base64url');
+            console.log(h+'.'+p+'.'+sig);
+          ")
+          echo "=== GET /health ==="
+          curl -sf http://localhost:4000/health
+          echo ""
+          echo "=== GET /products (with JWT) ==="
+          curl -sf -H "Authorization: Bearer $JWT" http://localhost:4000/products | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const r=JSON.parse(d);console.log('success:',r.success,'products:',r.data?.products?.length??'n/a')})"
+          echo "=== GET /products/categories ==="
+          curl -sf -H "Authorization: Bearer $JWT" http://localhost:4000/products/categories | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const r=JSON.parse(d);console.log('success:',r.success,'categories:',r.data?.length??'n/a')})"
+          echo "=== GET /inbox ==="
+          curl -sf -H "Authorization: Bearer $JWT" http://localhost:4000/inbox | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const r=JSON.parse(d);console.log('success:',r.success,'count:',r.data?.conversations?.length??'n/a')})"
+
       - name: Run Playwright tests
         run: pnpm test:e2e --reporter=list,html
 
