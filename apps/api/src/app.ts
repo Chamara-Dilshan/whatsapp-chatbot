@@ -10,6 +10,15 @@ import { captureRawBody } from './middleware/rawBody';
 import { apiLimiter } from './middleware/rateLimiter';
 import routes from './routes';
 import { logger } from './lib/logger';
+import { httpRequestsTotal } from './lib/metrics';
+
+// Normalise Express path params and raw IDs from a URL path string
+function normalisePath(path: string): string {
+  return path
+    .replace(/\/[0-9a-f]{20,}/gi, '/:id') // cuid / nanoid
+    .replace(/\/[0-9a-f-]{36}/gi, '/:id') // UUID
+    .replace(/\/\d+/g, '/:id'); // numeric IDs
+}
 
 export function createApp() {
   const app = express();
@@ -38,6 +47,15 @@ export function createApp() {
 
   // Compression
   app.use(compression());
+
+  // HTTP metrics — attach before routes so res.on('finish') fires after routing
+  app.use((req, res, next) => {
+    res.on('finish', () => {
+      const route = (req.route?.path as string | undefined) ?? normalisePath(req.path);
+      httpRequestsTotal.inc({ method: req.method, route, status: String(res.statusCode) });
+    });
+    next();
+  });
 
   // General API rate limiting (skips /webhook/whatsapp to avoid blocking Meta)
   app.use((req, res, next) => {

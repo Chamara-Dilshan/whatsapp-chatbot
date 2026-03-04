@@ -12,6 +12,7 @@ interface Template {
   name: string;
   body: string;
   isActive: boolean;
+  metaStatus?: string | null;
 }
 
 export default function SettingsPage() {
@@ -87,6 +88,8 @@ export default function SettingsPage() {
   });
   const [templateFormLoading, setTemplateFormLoading] = useState(false);
   const [templateFormError, setTemplateFormError] = useState<string | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
 
   const isAdmin = user?.role === 'owner' || user?.role === 'admin';
 
@@ -358,6 +361,24 @@ export default function SettingsPage() {
       setTemplateFormError(err.message || 'Failed to delete template');
     } finally {
       setTemplateFormLoading(false);
+    }
+  };
+
+  const handleSyncMetaTemplates = async () => {
+    setSyncLoading(true);
+    setSyncResult(null);
+    setTemplatesError(null);
+    try {
+      const res = await api.syncMetaTemplates();
+      const { synced, skipped, errors } = res.data;
+      setSyncResult(
+        `Sync complete: ${synced} imported, ${skipped} skipped (no body), ${errors} errors.`
+      );
+      await loadTemplates();
+    } catch (err: any) {
+      setTemplatesError(err.message || 'Sync failed');
+    } finally {
+      setSyncLoading(false);
     }
   };
 
@@ -766,14 +787,28 @@ export default function SettingsPage() {
                     {templatesError}
                   </div>
                 )}
+                {syncResult && (
+                  <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
+                    {syncResult}
+                  </div>
+                )}
 
                 {isAdmin && (
-                  <button
-                    onClick={openCreateTemplateModal}
-                    className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
-                  >
-                    + Create Template
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={openCreateTemplateModal}
+                      className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+                    >
+                      + Create Template
+                    </button>
+                    <button
+                      onClick={handleSyncMetaTemplates}
+                      disabled={syncLoading}
+                      className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      {syncLoading ? 'Syncing...' : 'Sync from Meta'}
+                    </button>
+                  </div>
                 )}
 
                 {templatesLoading ? (
@@ -789,7 +824,8 @@ export default function SettingsPage() {
                         <tr>
                           <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Intent</th>
                           <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Name</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Status</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Active</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Meta</th>
                           {isAdmin && (
                             <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
                           )}
@@ -804,6 +840,26 @@ export default function SettingsPage() {
                               <Badge variant={template.isActive ? 'green' : 'gray'} size="sm">
                                 {template.isActive ? 'Active' : 'Inactive'}
                               </Badge>
+                            </td>
+                            <td className="px-4 py-2">
+                              {template.metaStatus ? (
+                                <Badge
+                                  variant={
+                                    template.metaStatus === 'APPROVED'
+                                      ? 'green'
+                                      : template.metaStatus === 'PENDING'
+                                      ? 'yellow'
+                                      : template.metaStatus === 'REJECTED'
+                                      ? 'red'
+                                      : 'gray'
+                                  }
+                                  size="sm"
+                                >
+                                  {template.metaStatus}
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-gray-400">Local</span>
+                              )}
                             </td>
                             {isAdmin && (
                               <td className="px-4 py-2 text-right">

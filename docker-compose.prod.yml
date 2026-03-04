@@ -138,6 +138,52 @@ services:
     networks:
       - internal
 
+  # ── Prometheus ───────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: wab-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+      - prometheusdata:/prometheus
+    depends_on:
+      - api
+    networks:
+      - internal
+
+  # ── Grafana ───────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: wab-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-changeme}
+      GF_SERVER_ROOT_URL: https://${DOMAIN}/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: 'true'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_ALERTING_ENABLED: 'false'           # use Grafana unified alerting
+      GF_UNIFIED_ALERTING_ENABLED: 'true'
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - internal
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/grafana/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # ── Nginx (Reverse Proxy + SSL) ────────────────────────────────────
   nginx:
     build:
@@ -164,6 +210,8 @@ volumes:
   redisdata:
   n8ndata:
   certbot-www:
+  prometheusdata:
+  grafanadata:
 
 networks:
   internal:

@@ -11,6 +11,7 @@ import { requireRole } from '../middleware/requireRole';
 import * as tenantWhatsAppService from '../services/tenant/tenantWhatsApp.service';
 import * as policyService from '../services/policy/policy.service';
 import * as templateService from '../services/template/template.service';
+import * as metaTemplateService from '../services/whatsapp/metaTemplate.service';
 
 const router = Router();
 
@@ -74,6 +75,21 @@ router.put(
     try {
       const input = updatePoliciesSchema.parse(req.body);
       const result = await policyService.updatePolicies(req.auth!.tenantId, input);
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── Meta Template Sync ───────────────────────────────────────────
+
+router.post(
+  '/tenant/whatsapp/templates/sync',
+  requireRole('owner', 'admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await metaTemplateService.syncMetaTemplates(req.auth!.tenantId);
       res.json({ success: true, data: result });
     } catch (err) {
       next(err);

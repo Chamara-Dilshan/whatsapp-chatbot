@@ -328,6 +328,10 @@ class ApiClient {
     });
   }
 
+  async syncMetaTemplates() {
+    return this.request<any>('/tenant/whatsapp/templates/sync', { method: 'POST' });
+  }
+
   // Team
   async getTeamMembers() {
     return this.request<any>('/team');

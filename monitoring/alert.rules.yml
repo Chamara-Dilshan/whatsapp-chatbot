@@ -1,0 +1,71 @@
+groups:
+  - name: whatsapp-bot
+    rules:
+      # ── API Health ──────────────────────────────────────────────────────
+      - alert: HighApiErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total[5m])) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High API error rate ({{ $value | humanizePercentage }})"
+          description: >
+            More than 1% of API requests are returning 5xx errors over the last 5 minutes.
+            Investigate recent deployments or upstream dependencies.
+
+      # ── Webhook Processing ───────────────────────────────────────────────
+      - alert: SlowWebhookProcessing
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(message_processing_duration_seconds_bucket[5m])) by (le)
+          ) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Webhook p95 processing time > 5s ({{ $value | humanizeDuration }})"
+          description: >
+            The p95 webhook processing latency has exceeded 5 seconds for 5 minutes.
+            Check queue depth, database performance, and AI provider latency.
+
+      # ── Queue Backup ─────────────────────────────────────────────────────
+      - alert: WebhookQueueBackup
+        expr: webhook_queue_depth > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Webhook queue backed up ({{ $value }} pending jobs)"
+          description: >
+            More than 100 webhook jobs are waiting in the processing queue.
+            The worker may be overwhelmed or stuck.
+
+      # ── Quota Violations ─────────────────────────────────────────────────
+      - alert: FrequentQuotaViolations
+        expr: sum(rate(quota_exceeded_total[5m])) by (tenant_id, quota_type) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tenant {{ $labels.tenant_id }} exceeding {{ $labels.quota_type }} quota"
+          description: >
+            Tenant {{ $labels.tenant_id }} is hitting {{ $labels.quota_type }} quota limits
+            frequently. Consider notifying them to upgrade their plan.
+
+      # ── AI Provider ──────────────────────────────────────────────────────
+      - alert: HighAiErrorRate
+        expr: |
+          sum(rate(ai_requests_total{status="error"}[5m])) by (provider)
+          /
+          sum(rate(ai_requests_total[5m])) by (provider) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High AI error rate for {{ $labels.provider }}"
+          description: >
+            More than 10% of AI requests to {{ $labels.provider }} are failing.
+            Check API key validity and provider status page.

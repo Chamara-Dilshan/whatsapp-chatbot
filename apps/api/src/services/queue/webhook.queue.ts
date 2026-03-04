@@ -11,6 +11,7 @@
 import { Queue } from 'bullmq';
 import { env } from '../../config/env';
 import { logger } from '../../lib/logger';
+import { queueDepth } from '../../lib/metrics';
 import type { WebhookPayload } from '../whatsapp/types';
 
 export interface WebhookJobData {
@@ -59,5 +60,6 @@ export async function enqueueWebhook(data: WebhookJobData): Promise<void> {
   await queue.add('process-webhook', data, {
     jobId: data.requestId, // Use requestId for deduplication
   });
+  queueDepth.inc();
   logger.debug({ requestId: data.requestId }, 'Webhook job enqueued');
 }

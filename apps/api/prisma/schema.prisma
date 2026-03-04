@@ -227,16 +227,17 @@ model TenantPolicies {
 // ─── Reply Templates ─────────────────────────────────────────────────
 
 model ReplyTemplate {
-  id        String   @id @default(cuid())
-  tenantId  String
-  intent    String
-  language  String   @default("EN")       // EN | SI | TA
-  tone      String   @default("FRIENDLY") // FORMAL | FRIENDLY | SHORT
-  name      String
-  body      String   @db.Text
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  tenantId   String
+  intent     String
+  language   String   @default("EN")       // EN | SI | TA
+  tone       String   @default("FRIENDLY") // FORMAL | FRIENDLY | SHORT
+  name       String
+  body       String   @db.Text
+  isActive   Boolean  @default(true)
+  metaStatus String?  // APPROVED | PENDING | REJECTED | null = local-only
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 

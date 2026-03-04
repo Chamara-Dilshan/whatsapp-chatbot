@@ -89,3 +89,12 @@ export const aiRequestDuration = new Histogram({
   buckets: [0.1, 0.25, 0.5, 1, 2, 5, 10],
   registers: [register],
 });
+
+// ── HTTP Requests ─────────────────────────────────────────────────────
+
+export const httpRequestsTotal = new Counter({
+  name: 'http_requests_total',
+  help: 'Total HTTP requests by method, route, and status code',
+  labelNames: ['method', 'route', 'status'],
+  registers: [register],
+});

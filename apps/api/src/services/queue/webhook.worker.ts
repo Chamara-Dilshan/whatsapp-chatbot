@@ -11,6 +11,7 @@ import { Worker } from 'bullmq';
 import { env } from '../../config/env';
 import { processWebhook } from '../whatsapp/webhook.service';
 import { logger } from '../../lib/logger';
+import { queueDepth } from '../../lib/metrics';
 import type { WebhookJobData } from './webhook.queue';
 
 function getBullMQConnection() {
@@ -44,10 +45,12 @@ export function startWebhookWorker(): void {
   );
 
   _worker.on('completed', (job) => {
+    queueDepth.dec();
     logger.debug({ jobId: job.id, requestId: (job.data as WebhookJobData).requestId }, 'Webhook job completed');
   });
 
   _worker.on('failed', (job, err) => {
+    queueDepth.dec();
     logger.error(
       { jobId: job?.id, requestId: (job?.data as WebhookJobData)?.requestId, err, attempt: job?.attemptsMade },
       'Webhook job failed'
