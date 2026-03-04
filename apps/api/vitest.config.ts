@@ -20,5 +20,8 @@ export default defineConfig({
     setupFiles: ['src/__tests__/setup.ts'],
     testTimeout: 30000,
     hookTimeout: 30000,
+    // Run test files sequentially to avoid TRUNCATE race conditions across
+    // parallel workers that share the same database.
+    fileParallelism: false,
   },
 });

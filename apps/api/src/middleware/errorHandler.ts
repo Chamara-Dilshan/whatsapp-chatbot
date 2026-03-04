@@ -33,7 +33,7 @@ export class UnauthorizedError extends AppError {
 
 export class ValidationError extends AppError {
   constructor(message = 'Validation error') {
-    super(400, 'VALIDATION_ERROR', message);
+    super(422, 'VALIDATION_ERROR', message);
   }
 }
 
@@ -59,7 +59,7 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
   }
 
   if (err instanceof ZodError) {
-    res.status(400).json({
+    res.status(422).json({
       success: false,
       error: {
         code: 'VALIDATION_ERROR',

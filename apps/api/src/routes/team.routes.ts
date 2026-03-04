@@ -13,7 +13,7 @@ router.use(requireAuth);
 router.get('/team', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await teamService.listTeamMembers(req.auth!.tenantId);
-    res.json({ success: true, data: result.members, meta: result.quota });
+    res.json({ success: true, data: { members: result.members, quota: result.quota } });
   } catch (err) {
     next(err);
   }

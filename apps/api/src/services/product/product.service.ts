@@ -66,7 +66,7 @@ export async function getProductByRetailerId(tenantId: string, retailerId: strin
  * List products for a tenant with optional filtering.
  */
 export async function listProducts(tenantId: string, query: ProductQueryInput) {
-  const where: Record<string, unknown> = { tenantId };
+  const where: Record<string, unknown> = { tenantId, isActive: true };
 
   if (query.category) {
     where.category = query.category;
