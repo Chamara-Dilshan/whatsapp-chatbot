@@ -5,7 +5,7 @@ import { resolve } from 'path';
 // Load .env.test into process.env BEFORE any module import resolves.
 // env.ts parses process.env at module load time via dotenv.config + Zod safeParse,
 // so test vars must be injected here, before defineConfig is evaluated.
-config({ path: resolve(__dirname, '.env.test'), override: true });
+config({ path: resolve(__dirname, '.env.test') });
 
 export default defineConfig({
   resolve: {
