@@ -16,6 +16,7 @@
     "prisma:studio": "pnpm --filter @whatsapp-bot/api prisma:studio",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
+    "test:api": "pnpm --filter @whatsapp-bot/api test",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
