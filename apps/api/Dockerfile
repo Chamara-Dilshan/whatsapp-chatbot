@@ -4,7 +4,7 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 # Install pnpm
-RUN npm install -g pnpm@8
+RUN npm install -g pnpm@9
 
 # Copy workspace config
 COPY pnpm-workspace.yaml ./
@@ -30,7 +30,7 @@ FROM node:18-alpine AS runner
 
 WORKDIR /app
 
-RUN npm install -g pnpm@8
+RUN npm install -g pnpm@9
 
 # Copy workspace config
 COPY pnpm-workspace.yaml ./

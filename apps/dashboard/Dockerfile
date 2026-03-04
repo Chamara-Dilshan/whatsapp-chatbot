@@ -3,7 +3,7 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-RUN npm install -g pnpm@8
+RUN npm install -g pnpm@9
 
 COPY pnpm-workspace.yaml ./
 COPY package.json ./
@@ -28,7 +28,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm install -g pnpm@8
+RUN npm install -g pnpm@9
 
 COPY pnpm-workspace.yaml ./
 COPY package.json ./

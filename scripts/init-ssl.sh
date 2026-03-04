@@ -1,0 +1,141 @@
+#!/bin/bash
+# init-ssl.sh — First-time Let's Encrypt SSL setup + domain wiring
+# Run once from the repo root after filling in .env.production:
+#   sudo bash scripts/init-ssl.sh
+
+set -euo pipefail
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
+info() { echo -e "${GREEN}[ssl-init]${NC} $*"; }
+warn() { echo -e "${YELLOW}[warn]${NC}    $*"; }
+err()  { echo -e "${RED}[error]${NC}   $*"; exit 1; }
+
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ENV_FILE="${REPO_DIR}/.env.production"
+NGINX_CONF="${REPO_DIR}/nginx/nginx.conf"
+CERTS_DIR="${REPO_DIR}/nginx/certs"
+COMPOSE="docker compose -f ${REPO_DIR}/docker-compose.prod.yml --env-file ${ENV_FILE}"
+
+# ── Preflight checks ────────────────────────────────────────────────────
+[[ $EUID -ne 0 ]] && err "Please run as root: sudo bash $0"
+[[ -f "$ENV_FILE" ]] || err ".env.production not found. Copy .env.production.example and fill it in."
+command -v docker &>/dev/null || err "Docker is not installed. Run setup-server.sh first."
+command -v certbot &>/dev/null || err "certbot is not installed. Run setup-server.sh first."
+
+# ── Load DOMAIN from .env.production ───────────────────────────────────
+DOMAIN=$(grep -E '^DOMAIN=' "$ENV_FILE" | cut -d= -f2 | tr -d '"' | tr -d "'")
+[[ -z "$DOMAIN" ]] && err "DOMAIN is not set in .env.production"
+info "Domain: $DOMAIN"
+
+# ── 1. Wire domain into nginx.conf ─────────────────────────────────────
+if grep -q 'YOUR_DOMAIN_HERE' "$NGINX_CONF"; then
+  info "Substituting YOUR_DOMAIN_HERE with $DOMAIN in nginx.conf..."
+  sed -i "s/YOUR_DOMAIN_HERE/${DOMAIN}/g" "$NGINX_CONF"
+else
+  warn "nginx.conf already has a domain configured — skipping substitution."
+fi
+
+# ── 2. Create certs directory ───────────────────────────────────────────
+mkdir -p "$CERTS_DIR"
+
+# ── 3. Start only nginx on port 80 to serve the ACME challenge ─────────
+info "Starting nginx for ACME challenge (HTTP only)..."
+# Temporarily start just nginx so certbot can reach /.well-known/acme-challenge/
+# The SSL server block will fail until certs exist — use a minimal HTTP-only fallback.
+# We bring the full stack up after certs are in place.
+docker pull nginx:1.25-alpine
+docker run -d --name wab-certbot-nginx \
+  -p 80:80 \
+  -v "${REPO_DIR}/nginx/certbot-challenge.conf:/etc/nginx/conf.d/default.conf:ro" \
+  -v "whatsapp-chatbot_certbot-www:/var/www/certbot" \
+  nginx:1.25-alpine 2>/dev/null || true
+
+# Write a minimal nginx config just for the challenge
+mkdir -p "${REPO_DIR}/nginx"
+cat > "${REPO_DIR}/nginx/certbot-challenge.conf" <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN};
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    location / {
+        return 200 'OK';
+        add_header Content-Type text/plain;
+    }
+}
+EOF
+
+# Restart the temp container with the new config
+docker stop wab-certbot-nginx 2>/dev/null || true
+docker rm wab-certbot-nginx 2>/dev/null || true
+docker run -d --name wab-certbot-nginx \
+  -p 80:80 \
+  -v "${REPO_DIR}/nginx/certbot-challenge.conf:/etc/nginx/conf.d/default.conf:ro" \
+  -v "whatsapp-chatbot_certbot-www:/var/www/certbot" \
+  nginx:1.25-alpine
+
+sleep 2  # give nginx a moment to start
+
+# ── 4. Obtain certificate ───────────────────────────────────────────────
+EMAIL=$(grep -E '^CERTBOT_EMAIL=' "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
+EMAIL_FLAG="--register-unsafely-without-email"
+[[ -n "$EMAIL" ]] && EMAIL_FLAG="--email ${EMAIL}"
+
+info "Running certbot for $DOMAIN..."
+certbot certonly \
+  --webroot \
+  --webroot-path /var/www/certbot \
+  $EMAIL_FLAG \
+  --agree-tos \
+  --no-eff-email \
+  -d "$DOMAIN"
+
+# ── 5. Copy certs to nginx/certs/ ──────────────────────────────────────
+info "Copying certificates to ${CERTS_DIR}..."
+cp /etc/letsencrypt/live/"${DOMAIN}"/fullchain.pem "${CERTS_DIR}/fullchain.pem"
+cp /etc/letsencrypt/live/"${DOMAIN}"/privkey.pem   "${CERTS_DIR}/privkey.pem"
+chmod 644 "${CERTS_DIR}/fullchain.pem"
+chmod 600 "${CERTS_DIR}/privkey.pem"
+
+# ── 6. Stop temp nginx ──────────────────────────────────────────────────
+docker stop wab-certbot-nginx && docker rm wab-certbot-nginx
+
+# ── 7. Install renewal hook ─────────────────────────────────────────────
+HOOK_PATH=/etc/letsencrypt/renewal-hooks/deploy/whatsapp-chatbot.sh
+info "Installing certbot renewal deploy hook at ${HOOK_PATH}..."
+cat > "$HOOK_PATH" <<HOOK
+#!/bin/bash
+# Auto-generated by init-ssl.sh — runs after every successful cert renewal
+bash ${REPO_DIR}/scripts/renew-ssl.sh
+HOOK
+chmod +x "$HOOK_PATH"
+
+# ── 8. Schedule renewal check (systemd timer or cron) ──────────────────
+if systemctl is-enabled certbot.timer &>/dev/null; then
+  info "certbot.timer is already active — auto-renewal is handled by systemd."
+else
+  warn "certbot.timer not found — adding weekly cron job..."
+  CRON_LINE="0 3 * * 0 certbot renew --quiet"
+  (crontab -l 2>/dev/null | grep -v 'certbot renew'; echo "$CRON_LINE") | crontab -
+  info "Cron job added: $CRON_LINE"
+fi
+
+# ── 9. Start the full production stack ─────────────────────────────────
+info "Starting all production containers..."
+$COMPOSE up -d --build
+
+info "Waiting for health checks..."
+sleep 15
+$COMPOSE ps
+
+echo ""
+echo -e "${GREEN}╔══════════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║  SSL setup complete!                                      ║${NC}"
+echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
+echo ""
+echo "  API health:  https://${DOMAIN}/health"
+echo "  Dashboard:   https://${DOMAIN}/login"
+echo "  n8n:         https://${DOMAIN}/n8n/"
+echo ""
+echo "Cert expires: $(openssl x509 -enddate -noout -in ${CERTS_DIR}/fullchain.pem | cut -d= -f2)"
