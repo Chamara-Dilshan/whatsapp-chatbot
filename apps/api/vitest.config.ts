@@ -8,6 +8,12 @@ import { resolve } from 'path';
 config({ path: resolve(__dirname, '.env.test'), override: true });
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      // Point directly at TS source so Vitest doesn't need the compiled dist/
+      '@whatsapp-bot/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
+    },
+  },
   test: {
     environment: 'node',
     globals: true,
