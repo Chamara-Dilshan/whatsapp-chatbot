@@ -54,13 +54,23 @@ export async function syncMetaTemplates(
 
   if (!connection.wabaId) {
     throw new AppError(
+      400,
+      'MISSING_CONFIG',
       'WhatsApp Business Account ID (WABA ID) is not set. ' +
-        'Edit your WhatsApp connection and enter the WABA ID to enable template sync.',
-      400
+        'Edit your WhatsApp connection and enter the WABA ID to enable template sync.'
     );
   }
 
-  const accessToken = decrypt(connection.accessTokenEnc);
+  let accessToken: string;
+  try {
+    accessToken = decrypt(connection.accessTokenEnc);
+  } catch {
+    throw new AppError(
+      400,
+      'INVALID_TOKEN',
+      'The stored access token could not be decrypted. Re-connect your WhatsApp account with a valid access token.'
+    );
+  }
 
   // Paginate through all templates (Meta paginates at 10 by default; we request up to 200)
   const allTemplates: MetaTemplate[] = [];
@@ -75,7 +85,7 @@ export async function syncMetaTemplates(
 
     if (!resp.ok) {
       const body = await resp.text();
-      throw new AppError(`Meta API error ${resp.status}: ${body}`, 502);
+      throw new AppError(502, 'META_API_ERROR', `Meta API error ${resp.status}: ${body}`);
     }
 
     const json = (await resp.json()) as MetaTemplatesResponse;
