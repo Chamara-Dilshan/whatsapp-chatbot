@@ -2,6 +2,9 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# Install OpenSSL (required by Prisma migration engine on Alpine)
+RUN apk add --no-cache openssl libc6-compat
+
 # Install pnpm
 RUN npm install -g pnpm@9
 
