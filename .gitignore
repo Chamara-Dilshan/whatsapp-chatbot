@@ -26,7 +26,6 @@ pgdata/
 .claude/
 PLAN.md
 CLAUDE.md
-docs
 .playwright-mcp
 
 # Playwright E2E
