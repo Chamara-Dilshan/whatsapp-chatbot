@@ -28,9 +28,6 @@ RUN pnpm --filter @whatsapp-bot/api exec prisma generate
 RUN pnpm --filter @whatsapp-bot/shared build
 RUN pnpm --filter @whatsapp-bot/api build
 
-# Prune dev dependencies
-RUN pnpm prune --prod
-
 WORKDIR /app/apps/api
 
 # Run database migrations then start
