@@ -5,6 +5,21 @@ After setup, every `git push` auto-deploys everything.
 
 ---
 
+## Deployment Progress
+
+| Phase | Step | Status |
+|-------|------|--------|
+| 1 | GitHub — Push code | ✅ Done |
+| 2 | Neon — PostgreSQL database | ✅ Done |
+| 3 | Upstash — Redis | ✅ Done |
+| 4 | Fly.io — API server | ✅ Done — `https://chamara-whatsapp-api.fly.dev` |
+| 5 | Vercel — Dashboard | ⬜ Next |
+| 6 | Auto-deploy on git push | ⬜ Pending (needs FLY_API_TOKEN in GitHub Secrets) |
+| 7 | Connect WhatsApp (Meta) | ⬜ Pending |
+| 8 | Register first account | ⬜ Pending |
+
+---
+
 ## What You'll Create (All Free)
 
 | Account | Purpose | Sign Up Link |
@@ -19,7 +34,7 @@ After setup, every `git push` auto-deploys everything.
 
 ---
 
-## Phase 1 — GitHub (Push Your Code)
+## Phase 1 — GitHub (Push Your Code) ✅
 
 You need your code on GitHub so the other platforms can pull it.
 
@@ -53,7 +68,7 @@ Replace `YOUR_USERNAME` with your actual GitHub username.
 
 ---
 
-## Phase 2 — Neon (PostgreSQL Database)
+## Phase 2 — Neon (PostgreSQL Database) ✅
 
 ### 1. Create Account
 
@@ -82,7 +97,7 @@ postgresql://username:password@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmod
 
 ---
 
-## Phase 3 — Upstash (Redis)
+## Phase 3 — Upstash (Redis) ✅
 
 ### 1. Create Account
 
@@ -112,7 +127,7 @@ rediss://default:password@global-xxx.upstash.io:6379
 
 ---
 
-## Phase 4 — Fly.io (API Server)
+## Phase 4 — Fly.io (API Server) ✅
 
 ### 1. Create Account
 
@@ -223,7 +238,7 @@ Your API is live at: `https://your-app-name.fly.dev`
 
 ---
 
-## Phase 5 — Vercel (Dashboard)
+## Phase 5 — Vercel (Dashboard) ⬜ ← NEXT
 
 ### 1. Create Account
 
@@ -261,7 +276,7 @@ fly secrets set \
 
 ---
 
-## Phase 6 — Auto-Deploy on Git Push
+## Phase 6 — Auto-Deploy on Git Push ⬜
 
 Vercel already auto-deploys when you push to `main`. Now set up the same for Fly.io.
 
@@ -287,7 +302,7 @@ It triggers automatically on every push to `main` that changes API or shared cod
 
 ---
 
-## Phase 7 — Connect WhatsApp
+## Phase 7 — Connect WhatsApp ⬜
 
 ### 1. Create Meta Developer Account
 
@@ -324,7 +339,7 @@ On the Getting Started page, you'll see:
 
 ---
 
-## Phase 8 — Register Your First Account
+## Phase 8 — Register Your First Account ⬜
 
 Open your Vercel dashboard URL:
 
