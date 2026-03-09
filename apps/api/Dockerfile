@@ -28,7 +28,10 @@ RUN pnpm --filter @whatsapp-bot/api exec prisma generate
 RUN pnpm --filter @whatsapp-bot/shared build
 RUN pnpm --filter @whatsapp-bot/api build
 
+# Verify build output exists (fails build if dist/server.js missing)
+RUN ls -la /app/apps/api/dist/server.js
+
 WORKDIR /app/apps/api
 
-# Run database migrations then start
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+# Run database migrations then start (use direct path for prisma)
+CMD ["sh", "-c", "/app/node_modules/.bin/prisma migrate deploy && node dist/server.js"]
