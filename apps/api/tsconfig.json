@@ -6,7 +6,6 @@
     "moduleResolution": "node",
     "declaration": false,
     "declarationMap": false,
-    "rootDir": "src",
     "paths": {
       "@/*": ["./src/*"],
       "@whatsapp-bot/shared": ["../../packages/shared/src"]
