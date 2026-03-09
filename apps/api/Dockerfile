@@ -34,4 +34,4 @@ RUN ls -la /app/apps/api/dist/apps/api/src/server.js
 WORKDIR /app/apps/api
 
 # Run database migrations then start
-CMD ["sh", "-c", "/app/node_modules/.bin/prisma migrate deploy && node dist/apps/api/src/server.js"]
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/apps/api/src/server.js"]
