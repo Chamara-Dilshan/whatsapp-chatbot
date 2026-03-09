@@ -1,5 +1,4 @@
-# ── Stage 1: Builder ──────────────────────────────────────────────────
-FROM node:18-alpine AS builder
+FROM node:18-alpine
 
 WORKDIR /app
 
@@ -16,7 +15,7 @@ COPY tsconfig.json ./
 COPY packages/ ./packages/
 COPY apps/api/ ./apps/api/
 
-# Install dependencies
+# Install all dependencies
 RUN pnpm install --frozen-lockfile
 
 # Generate Prisma client
@@ -26,31 +25,8 @@ RUN pnpm --filter @whatsapp-bot/api exec prisma generate
 RUN pnpm --filter @whatsapp-bot/shared build
 RUN pnpm --filter @whatsapp-bot/api build
 
-# ── Stage 2: Runner ───────────────────────────────────────────────────
-FROM node:18-alpine AS runner
-
-WORKDIR /app
-
-RUN npm install -g pnpm@9
-
-# Copy workspace config
-COPY pnpm-workspace.yaml ./
-COPY package.json ./
-COPY pnpm-lock.yaml ./
-
-# Copy source for Prisma
-COPY packages/ ./packages/
-COPY apps/api/package.json ./apps/api/
-COPY apps/api/prisma/ ./apps/api/prisma/
-
-# Install production dependencies only
-RUN pnpm install --frozen-lockfile --prod
-
-# Generate Prisma client in runner stage
-RUN pnpm --filter @whatsapp-bot/api exec prisma generate
-
-# Copy built output from builder
-COPY --from=builder /app/apps/api/dist ./apps/api/dist
+# Prune dev dependencies
+RUN pnpm prune --prod
 
 WORKDIR /app/apps/api
 
