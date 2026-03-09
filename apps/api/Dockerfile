@@ -46,9 +46,11 @@ COPY apps/api/prisma/ ./apps/api/prisma/
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
 
+# Generate Prisma client in runner stage
+RUN pnpm --filter @whatsapp-bot/api exec prisma generate
+
 # Copy built output from builder
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 WORKDIR /app/apps/api
 
