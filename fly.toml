@@ -1,0 +1,42 @@
+# fly.toml app configuration file generated for chamara-whatsapp-api on 2026-03-09T20:54:37+05:30
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'chamara-whatsapp-api'
+primary_region = 'sin'
+
+[build]
+  dockerfile = 'apps/api/Dockerfile'
+
+[env]
+  NODE_ENV = 'production'
+  PORT = '4000'
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = 'requests'
+    hard_limit = 200
+    soft_limit = 150
+
+[checks]
+  [checks.health]
+    port = 4000
+    type = 'http'
+    interval = '30s'
+    timeout = '10s'
+    grace_period = '30s'
+    method = 'GET'
+    path = '/health'
+
+[[vm]]
+  memory = '256mb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 256
