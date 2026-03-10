@@ -25,7 +25,7 @@ pgdata/
 # Claude AI
 .claude/
 PLAN.md
-CLAUDE.md
+CLAUDE.mdl
 docs
 .playwright-mcp
 
