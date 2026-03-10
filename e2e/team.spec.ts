@@ -17,7 +17,7 @@ test.describe('Team page', () => {
   });
 
   test('shows demo members: owner, agent, agent2', async ({ ownerPage: page }) => {
-    await expect(page.getByText('Acme Owner')).toBeVisible();
+    await expect(page.getByText('Acme Owner').first()).toBeVisible();
     // exact:true so "Acme Agent2" doesn't also match; first() because the name
     // appears in both the desktop table cell and the mobile card span.
     await expect(page.getByText('Acme Agent', { exact: true }).first()).toBeVisible();
