@@ -16,6 +16,7 @@ import type { WebhookJobData } from './webhook.queue';
 
 function getBullMQConnection() {
   const url = new URL(env.REDIS_URL);
+  const isTLS = url.protocol === 'rediss:';
   return {
     host: url.hostname,
     port: parseInt(url.port || '6379', 10),
@@ -23,6 +24,7 @@ function getBullMQConnection() {
     db: url.pathname ? parseInt(url.pathname.slice(1) || '0', 10) : 0,
     maxRetriesPerRequest: null as unknown as number,
     enableReadyCheck: false,
+    ...(isTLS && { tls: {} }),
   };
 }
 
