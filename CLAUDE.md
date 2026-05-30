@@ -71,7 +71,7 @@ packages/shared/   - Zod schemas + types + constants
 - `src/services/response/responseEngine.ts` - Template-based response generation + agent handoff + product inquiry handler
 - `src/services/tenant/tenantRouting.service.ts` - phone_number_id → tenant (LRU cache)
 - `src/services/auth/auth.service.ts` - register, login, getMe, requestPasswordReset, resetPassword
-- `src/services/email/email.service.ts` - Resend email client (sendPasswordResetEmail; logs URL to console if RESEND_API_KEY not set)
+- `src/services/email/email.service.ts` - Gmail SMTP email client via nodemailer (sendPasswordResetEmail; logs URL to console if SMTP_USER/SMTP_PASS not set)
 - `src/lib/crypto.util.ts` - AES-256-GCM encrypt/decrypt, HMAC-SHA256
 - `src/lib/jwt.util.ts` - JWT sign/verify
 - `src/middleware/signatureVerify.ts` - X-Hub-Signature-256 verification
@@ -218,8 +218,9 @@ Copy `.env.example` to `.env` at repo root AND to `apps/api/.env` (Prisma needs 
 - `GEMINI_API_KEY` - Google Gemini API key (required if AI_PROVIDER=gemini)
 - `AI_MODEL` - Model override (default: `claude-3-5-haiku-20241022` for Anthropic, `gpt-4o-mini` for OpenAI, `gemini-2.5-flash` for Gemini)
 - `AI_TIMEOUT_MS` - AI call timeout in milliseconds (default: 5000)
-- `RESEND_API_KEY` - Resend API key for sending password reset emails (optional; logs URL to console if not set)
-- `EMAIL_FROM` - Sender address for outgoing emails (default: `noreply@example.com`)
+- `SMTP_USER` - Gmail address for sending password reset emails (optional; logs URL to console if not set)
+- `SMTP_PASS` - Gmail App Password for SMTP authentication (16 chars, not your real password)
+- `EMAIL_FROM` - Sender name/address for outgoing emails (optional; defaults to SMTP_USER)
 
 See `.env.production.example` for full production var list with comments.
 
