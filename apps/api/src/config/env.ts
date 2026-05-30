@@ -35,9 +35,10 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().optional(),
   AI_MODEL: z.string().optional(), // defaults handled per provider
   AI_TIMEOUT_MS: z.coerce.number().default(5000),
-  // Email (Resend)
-  RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().email().default('noreply@example.com'),
+  // Email (Gmail SMTP)
+  SMTP_USER: z.string().email().optional(),
+  SMTP_PASS: z.string().optional(),
+  EMAIL_FROM: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
